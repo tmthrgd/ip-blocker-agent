@@ -20,7 +20,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -139,81 +138,8 @@ func main() {
 
 	defer unix.Close(int(fd))
 
-	var wg sync.WaitGroup
-	var mut sync.Mutex
-
 	ip4s := &ipSearcher{net.IPv4len, nil}
 	ip6s := &ipSearcher{net.IPv6len, nil}
-
-	for _, block := range [...]string{
-		/* boradcast; RFC 1700 */
-		//"0.0.0.0/8", /* too big */
-
-		/* link-local addresses; RFC 3927 */
-		"169.254.0.0/16",
-
-		/* TEST-NET, TEST-NET2, TEST-NET3; RFC 5737 */
-		"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24",
-
-		/* multicast; RFC 5771 */
-		//"224.0.0.0/4", /* too big */
-
-		/* "limited broadcast"; RFC 6890 */
-		"255.255.255.255/32",
-
-		/* Unspecified address */
-		"::/128",
-
-		/* Discard prefix; RFC 6666 */
-		//"100::/64", /* 2^64; too big */
-
-		/* documentation */
-		//"2001:db8::/32", /* 2^96; too big */
-	} {
-		wg.Add(1)
-
-		go func(block string) {
-			defer wg.Done()
-
-			ip, ipnet, err := net.ParseCIDR(block)
-			if err != nil {
-				panic(err)
-			}
-
-			ip = ip.Mask(ipnet.Mask)
-
-			if ip4 := ip.To4(); ip4 != nil {
-				ip = ip4
-			} else {
-				ip = ip.To16()
-			}
-
-			var ips []byte
-
-			for ; ipnet.Contains(ip); incIP(ip) {
-				ips = append(ips, ip...)
-			}
-
-			mut.Lock()
-			if len(ip) == net.IPv4len {
-				ip4s.UnsortedInsertMany(ips)
-			} else {
-				ip6s.UnsortedInsertMany(ips)
-			}
-			mut.Unlock()
-		}(block)
-	}
-
-	wg.Wait()
-
-	wg.Add(1)
-	go func() {
-		ip4s.Sort()
-		wg.Done()
-	}()
-
-	ip6s.Sort()
-	wg.Wait()
 
 	ip4BasePos := ngx_align(headerSize, ngx_cacheline_size)
 	ip6BasePos := ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
