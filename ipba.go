@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sys/unix"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -289,26 +290,68 @@ func main() {
 			ip4s.Clear()
 			ip6s.Clear()
 		} else {
-			ip := net.ParseIP(line[1:])
-			if ip == nil {
-				fmt.Printf("invalid ip address: %s\n", line[1:])
-				continue
-			}
-
-			ip4 := ip.To4()
-
-			switch line[0] {
-			case '+':
-				if ip4 != nil {
-					ip4s.Insert(ip4)
-				} else {
-					ip6s.Insert(ip)
+			if strings.Contains(line[1:], "/") {
+				ip, ipnet, err := net.ParseCIDR(line[1:])
+				if err != nil {
+					fmt.Printf("invalid cidr mask: %s (%v)\n", line[1:], err)
+					continue
 				}
-			case '-':
+
+				ip = ip.Mask(ipnet.Mask)
+				ip4 := ip.To4()
+
 				if ip4 != nil {
-					ip4s.Remove(ip4)
+					ip = ip4
 				} else {
-					ip6s.Remove(ip)
+					ip = ip.To16()
+				}
+
+				switch line[0] {
+				case '+':
+					var ips []byte
+
+					for ; ipnet.Contains(ip); incIP(ip) {
+						ips = append(ips, ip...)
+					}
+
+					if ip4 != nil {
+						ip4s.UnsortedInsertMany(ips)
+						ip4s.Sort()
+					} else {
+						ip6s.UnsortedInsertMany(ips)
+						ip6s.Sort()
+					}
+				case '-':
+					for ; ipnet.Contains(ip); incIP(ip) {
+						if ip4 != nil {
+							ip4s.Remove(ip4)
+						} else {
+							ip6s.Remove(ip)
+						}
+					}
+				}
+			} else {
+				ip := net.ParseIP(line[1:])
+				if ip == nil {
+					fmt.Printf("invalid ip address: %s\n", line[1:])
+					continue
+				}
+
+				ip4 := ip.To4()
+
+				switch line[0] {
+				case '+':
+					if ip4 != nil {
+						ip4s.Insert(ip4)
+					} else {
+						ip6s.Insert(ip)
+					}
+				case '-':
+					if ip4 != nil {
+						ip4s.Remove(ip4)
+					} else {
+						ip6s.Remove(ip)
+					}
 				}
 			}
 		}
