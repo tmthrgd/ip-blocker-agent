@@ -110,9 +110,6 @@ func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
 
-	var unlink bool
-	flag.BoolVar(&unlink, "unlink", false, "unlink shared memory")
-
 	flag.Parse()
 
 	if len(name) == 0 {
@@ -123,13 +120,18 @@ func main() {
 	nameC := C.CString(name)
 	defer C.free(unsafe.Pointer(nameC))
 
-	if unlink {
-		_, err := C.shm_unlink(nameC)
-		if err != nil {
-			panic(err)
-		}
-
-		return
+	/* Taken from shm_unlink(3):
+	 *
+	 * The  operation  of shm_unlink() is analogous to unlink(2): it removes a
+	 * shared memory object name, and, once all processes  have  unmapped  the
+	 * object, de-allocates and destroys the contents of the associated memory
+	 * region.  After a successful shm_unlink(),  attempts  to  shm_open()  an
+	 * object  with  the same name will fail (unless O_CREAT was specified, in
+	 * which case a new, distinct object is created).
+	 */
+	_, err := C.shm_unlink(nameC)
+	if err != nil && err != unix.ENOENT {
+		panic(err)
 	}
 
 	fd, err := C.shm_open(nameC, C.O_CREAT|C.O_EXCL|C.O_TRUNC|C.O_RDWR, 0644)
@@ -137,6 +139,21 @@ func main() {
 		panic(err)
 	}
 
+	defer func() {
+		/* Taken from shm_unlink(3):
+		 *
+		 * The  operation  of shm_unlink() is analogous to unlink(2): it removes a
+		 * shared memory object name, and, once all processes  have  unmapped  the
+		 * object, de-allocates and destroys the contents of the associated memory
+		 * region.  After a successful shm_unlink(),  attempts  to  shm_open()  an
+		 * object  with  the same name will fail (unless O_CREAT was specified, in
+		 * which case a new, distinct object is created).
+		 */
+		_, err := C.shm_unlink(nameC)
+		if err != nil {
+			panic(err)
+		}
+	}()
 	defer unix.Close(int(fd))
 
 	ip4s := &ipSearcher{net.IPv4len, nil}
