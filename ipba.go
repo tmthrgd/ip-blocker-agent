@@ -13,14 +13,14 @@ package main
 import "C"
 
 import (
-	"bytes"
+	"bufio"
 	"flag"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"net"
 	"os"
-	"sort"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -35,27 +35,6 @@ func ngx_align(d, a uintptr) uintptr {
 	return (d + (a - 1)) &^ (a - 1)
 }
 
-type ipSearcher struct {
-	ips  []byte
-	Size int
-}
-
-func (p *ipSearcher) Len() int {
-	return len(p.ips) / p.Size
-}
-
-func (p *ipSearcher) Less(i, j int) bool {
-	return bytes.Compare(p.ips[i*p.Size:(i+1)*p.Size], p.ips[j*p.Size:(j+1)*p.Size]) < 0
-}
-
-func (p *ipSearcher) Swap(i, j int) {
-	var tmp [net.IPv6len]byte
-
-	copy(tmp[:], p.ips[i*p.Size:(i+1)*p.Size])
-	copy(p.ips[i*p.Size:(i+1)*p.Size], p.ips[j*p.Size:(j+1)*p.Size])
-	copy(p.ips[j*p.Size:(j+1)*p.Size], tmp[:])
-}
-
 func incIP(ip net.IP) {
 	for j := len(ip) - 1; j >= 0; j-- {
 		ip[j]++
@@ -64,6 +43,66 @@ func incIP(ip net.IP) {
 			break
 		}
 	}
+}
+
+type rwLock C.ngx_ip_blocker_rwlock_st
+
+func (rw *rwLock) Create() {
+	if err := sem_init(&rw.writer_sem, true, 0); err != nil {
+		panic(err)
+	}
+
+	if err := sem_init(&rw.reader_sem, true, 0); err != nil {
+		panic(err)
+	}
+
+	rw.reader_count = 0
+	rw.reader_wait = 0
+}
+
+// Lock locks rw for writing.
+// If the lock is already locked for reading or writing,
+// Lock blocks until the lock is available.
+// To ensure that the lock eventually becomes available,
+// a blocked Lock call excludes new readers from acquiring
+// the lock.
+func (rw *rwLock) Lock() {
+	// First, resolve competition with other writers.
+	//rw.w.Lock()
+
+	// Announce to readers there is a pending writer.
+	r := atomic.AddInt32((*int32)(&rw.reader_count), -C.NGX_IP_BLOCKER_MAX_READERS) + C.NGX_IP_BLOCKER_MAX_READERS
+
+	// Wait for active readers.
+	if r != 0 && atomic.AddInt32((*int32)(&rw.reader_wait), r) != 0 {
+		if err := sem_wait(&rw.writer_sem); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// Unlock unlocks rw for writing.  It is a run-time error if rw is
+// not locked for writing on entry to Unlock.
+//
+// As with Mutexes, a locked rwLock is not associated with a particular
+// goroutine.  One goroutine may RLock (Lock) an rwLock and then
+// arrange for another goroutine to RUnlock (Unlock) it.
+func (rw *rwLock) Unlock() {
+	// Announce to readers there is no active writer.
+	r := atomic.AddInt32((*int32)(&rw.reader_count), C.NGX_IP_BLOCKER_MAX_READERS)
+	if r >= C.NGX_IP_BLOCKER_MAX_READERS {
+		panic("sync: Unlock of unlocked rwLock")
+	}
+
+	// Unblock blocked readers, if any.
+	for i := 0; i < int(r); i++ {
+		if err := sem_post(&rw.reader_sem); err != nil {
+			panic(err)
+		}
+	}
+
+	// Allow other writers to proceed.
+	//rw.w.Unlock()
 }
 
 func main() {
@@ -102,8 +141,8 @@ func main() {
 	var wg sync.WaitGroup
 	var mut sync.Mutex
 
-	var blockedIP4s []byte
-	var blockedIP6s []byte
+	ip4s := &ipSearcher{net.IPv4len, nil}
+	ip6s := &ipSearcher{net.IPv6len, nil}
 
 	for _, block := range [...]string{
 		/* boradcast; RFC 1700 */
@@ -156,9 +195,9 @@ func main() {
 
 			mut.Lock()
 			if len(ip) == net.IPv4len {
-				blockedIP4s = append(blockedIP4s, ips...)
+				ip4s.UnsortedInsertMany(ips)
 			} else {
-				blockedIP6s = append(blockedIP6s, ips...)
+				ip6s.UnsortedInsertMany(ips)
 			}
 			mut.Unlock()
 		}(block)
@@ -166,21 +205,18 @@ func main() {
 
 	wg.Wait()
 
-	ip4s := &ipSearcher{blockedIP4s, net.IPv4len}
-	ip6s := &ipSearcher{blockedIP6s, net.IPv6len}
-
 	wg.Add(1)
 	go func() {
-		sort.Sort(ip4s)
+		ip4s.Sort()
 		wg.Done()
 	}()
 
-	sort.Sort(ip6s)
+	ip6s.Sort()
 	wg.Wait()
 
 	ip4BasePos := ngx_align(headerSize, ngx_cacheline_size)
-	ip6BasePos := ngx_align(ip4BasePos+uintptr(len(blockedIP4s)), ngx_cacheline_size)
-	size := ngx_align(ip6BasePos+uintptr(len(blockedIP6s)), ngx_cacheline_size)
+	ip6BasePos := ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
+	size := ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 		panic(err)
@@ -198,20 +234,166 @@ func main() {
 	}()
 
 	header := (*C.ngx_ip_blocker_shm_st)(addr)
+	lock := (*rwLock)(&header.lock)
 
-	header.ip4.base = C.size_t(ip4BasePos)
-	header.ip4.len = C.size_t(len(blockedIP4s))
+	lock.Create()
 
-	header.ip6.base = C.size_t(ip6BasePos)
-	header.ip6.len = C.size_t(len(blockedIP6s))
+	lock.Lock()
 
-	fmt.Printf("mapped %d bytes to %x\n", size, addr)
-	fmt.Printf("\tIP4 of %d bytes (%d entries) mapped to %x\n", header.ip4.len, ip4s.Len(), uintptr(addr)+ip4BasePos)
-	fmt.Printf("\tIP6 of %d bytes (%d entries) mapped to %x\n", header.ip6.len, ip6s.Len(), uintptr(addr)+ip6BasePos)
+	header.ip4.base = C.off_t(ip4BasePos)
+	header.ip4.len = C.size_t(len(ip4s.IPs))
+
+	header.ip6.base = C.off_t(ip6BasePos)
+	header.ip6.len = C.size_t(len(ip6s.IPs))
 
 	ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
-	copy(ip4Base[:header.ip4.len:ip6BasePos-ip4BasePos], blockedIP4s)
+	copy(ip4Base[:len(ip4s.IPs):ip6BasePos-ip4BasePos], ip4s.IPs)
 
 	ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
-	copy(ip6Base[:header.ip6.len:size-ip6BasePos], blockedIP6s)
+	copy(ip6Base[:len(ip6s.IPs):size-ip6BasePos], ip6s.IPs)
+
+	lock.Unlock()
+
+	fmt.Printf("mapped %d bytes to %x\n", size, addr)
+	fmt.Printf("\tIP4 of %d bytes (%d entries) mapped to %x\n", header.ip4.len, ip4s.Len(), uintptr(addr)+uintptr(header.ip4.base))
+	fmt.Printf("\tIP6 of %d bytes (%d entries) mapped to %x\n", header.ip6.len, ip6s.Len(), uintptr(addr)+uintptr(header.ip6.base))
+
+	stdin := bufio.NewScanner(os.Stdin)
+
+	for stdin.Scan() {
+		line := stdin.Text()
+		if len(line) == 0 {
+			fmt.Printf("invalid input: %s\n", line)
+			continue
+		}
+
+		switch line[0] {
+		case '+':
+			fallthrough
+		case '-':
+			if len(line) <= 1 {
+				fmt.Printf("invalid input: %s\n", line)
+				continue
+			}
+		case '!':
+			if len(line) != 1 {
+				fmt.Printf("invalid input: %s\n", line)
+				continue
+			}
+		default:
+			fmt.Printf("invalid operation: %c\n", line[0])
+			continue
+		}
+
+		if line[0] == '!' {
+			ip4s.Clear()
+			ip6s.Clear()
+		} else {
+			ip := net.ParseIP(line[1:])
+			if ip == nil {
+				fmt.Printf("invalid ip address: %s\n", line[1:])
+				continue
+			}
+
+			ip4 := ip.To4()
+
+			switch line[0] {
+			case '+':
+				if ip4 != nil {
+					ip4s.Insert(ip4)
+				} else {
+					ip6s.Insert(ip)
+				}
+			case '-':
+				if ip4 != nil {
+					ip4s.Remove(ip4)
+				} else {
+					ip6s.Remove(ip)
+				}
+			}
+		}
+
+		if _, err := C.munmap(addr, C.size_t(size)); err != nil {
+			panic(err)
+		}
+
+		ip4BasePos2 := ngx_align(headerSize, ngx_cacheline_size)
+		ip6BasePos2 := ngx_align(ip4BasePos2+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
+		size2 := ngx_align(ip6BasePos2+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+
+		if size2 > size {
+			size = size2
+		}
+
+		ip4BasePos = ngx_align(size, ngx_cacheline_size)
+		ip6BasePos = ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
+		size = ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+
+		if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
+			panic(err)
+		}
+
+		addr, err = C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
+		if err != nil {
+			panic(err)
+		}
+
+		header = (*C.ngx_ip_blocker_shm_st)(addr)
+		lock = (*rwLock)(&header.lock)
+
+		ip4Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
+		copy(ip4Base[:len(ip4s.IPs):ip6BasePos-ip4BasePos], ip4s.IPs)
+
+		ip6Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
+		copy(ip6Base[:len(ip6s.IPs):size-ip6BasePos], ip6s.IPs)
+
+		lock.Lock()
+
+		header.ip4.base = C.off_t(ip4BasePos)
+		header.ip4.len = C.size_t(len(ip4s.IPs))
+
+		header.ip6.base = C.off_t(ip6BasePos)
+		header.ip6.len = C.size_t(len(ip6s.IPs))
+
+		lock.Unlock()
+
+		ip4Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos2))
+		copy(ip4Base[:len(ip4s.IPs):ip6BasePos2-ip4BasePos2], ip4s.IPs)
+
+		ip6Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos2))
+		copy(ip6Base[:len(ip6s.IPs):size2-ip6BasePos2], ip6s.IPs)
+
+		lock.Lock()
+
+		header.ip4.base = C.off_t(ip4BasePos2)
+		header.ip6.base = C.off_t(ip6BasePos2)
+
+		lock.Unlock()
+
+		if _, err := C.munmap(addr, C.size_t(size)); err != nil {
+			panic(err)
+		}
+
+		size = size2
+
+		if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
+			panic(err)
+		}
+
+		addr, err = C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
+		if err != nil {
+			panic(err)
+		}
+
+		header = (*C.ngx_ip_blocker_shm_st)(addr)
+		lock = (*rwLock)(&header.lock)
+
+		fmt.Printf("mapped %d bytes to %x\n", size, addr)
+		fmt.Printf("\tIP4 of %d bytes (%d entries) mapped to %x\n", header.ip4.len, ip4s.Len(), uintptr(addr)+uintptr(header.ip4.base))
+		fmt.Printf("\tIP6 of %d bytes (%d entries) mapped to %x\n", header.ip6.len, ip6s.Len(), uintptr(addr)+uintptr(header.ip6.base))
+	}
+
+	if err = stdin.Err(); err != nil {
+		panic(err)
+	}
 }
