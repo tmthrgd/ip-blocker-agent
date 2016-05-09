@@ -7,6 +7,7 @@ package main
 #include <fcntl.h>           // For O_* constants
 #include <sys/stat.h>        // For mode constants
 #include <sys/mman.h>        // For shm_*
+#include <semaphore.h>       // For sem_*
 
 #include "ngx_ip_blocker_shm.h"
 */
@@ -48,11 +49,11 @@ func incIP(ip net.IP) {
 type rwLock C.ngx_ip_blocker_rwlock_st
 
 func (rw *rwLock) Create() {
-	if err := sem_init(&rw.writer_sem, true, 0); err != nil {
+	if _, err := C.sem_init(&rw.writer_sem, 1, 0); err != nil {
 		panic(err)
 	}
 
-	if err := sem_init(&rw.reader_sem, true, 0); err != nil {
+	if _, err := C.sem_init(&rw.reader_sem, 1, 0); err != nil {
 		panic(err)
 	}
 
@@ -75,7 +76,7 @@ func (rw *rwLock) Lock() {
 
 	// Wait for active readers.
 	if r != 0 && atomic.AddInt32((*int32)(&rw.reader_wait), r) != 0 {
-		if err := sem_wait(&rw.writer_sem); err != nil {
+		if _, err := C.sem_wait(&rw.writer_sem); err != nil {
 			panic(err)
 		}
 	}
@@ -96,7 +97,7 @@ func (rw *rwLock) Unlock() {
 
 	// Unblock blocked readers, if any.
 	for i := 0; i < int(r); i++ {
-		if err := sem_post(&rw.reader_sem); err != nil {
+		if _, err := C.sem_post(&rw.reader_sem); err != nil {
 			panic(err)
 		}
 	}
