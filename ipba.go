@@ -309,7 +309,6 @@ func main() {
 		}
 
 		switch line[0] {
-		case 'b':
 		case 'B':
 		case '!':
 			ip4s.Clear()
