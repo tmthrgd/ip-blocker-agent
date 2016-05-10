@@ -46,9 +46,32 @@ func incIP(ip net.IP) {
 	}
 }
 
+type mutex C.ngx_ip_blocker_mutex_st
+
+func (m *mutex) Create() {
+	if _, err := C.sem_init(&m.sem, 1, 1); err != nil {
+		panic(err)
+	}
+}
+
+func (m *mutex) Lock() {
+	if _, err := C.sem_wait(&m.sem); err != nil {
+		panic(err)
+	}
+}
+
+func (m *mutex) Unlock() {
+	if _, err := C.sem_post(&m.sem); err != nil {
+		panic(err)
+	}
+}
+
 type rwLock C.ngx_ip_blocker_rwlock_st
 
 func (rw *rwLock) Create() {
+	w := (*mutex)(&rw.w)
+	w.Create()
+
 	if _, err := C.sem_init(&rw.writer_sem, 1, 0); err != nil {
 		panic(err)
 	}
@@ -69,7 +92,8 @@ func (rw *rwLock) Create() {
 // the lock.
 func (rw *rwLock) Lock() {
 	// First, resolve competition with other writers.
-	//rw.w.Lock()
+	w := (*mutex)(&rw.w)
+	w.Lock()
 
 	// Announce to readers there is a pending writer.
 	r := atomic.AddInt32((*int32)(&rw.reader_count), -C.NGX_IP_BLOCKER_MAX_READERS) + C.NGX_IP_BLOCKER_MAX_READERS
@@ -103,7 +127,8 @@ func (rw *rwLock) Unlock() {
 	}
 
 	// Allow other writers to proceed.
-	//rw.w.Unlock()
+	w := (*mutex)(&rw.w)
+	w.Unlock()
 }
 
 func main() {
