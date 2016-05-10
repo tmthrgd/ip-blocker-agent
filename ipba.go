@@ -31,6 +31,8 @@ const (
 	headerSize = unsafe.Sizeof(C.ngx_ip_blocker_shm_st{})
 )
 
+var pageSize uintptr
+
 /* taken from ngx_config.h */
 func ngx_align(d, a uintptr) uintptr {
 	return (d + (a - 1)) &^ (a - 1)
@@ -44,6 +46,14 @@ func incIP(ip net.IP) {
 			break
 		}
 	}
+}
+
+func calculateOffsets(base uintptr, ip6Len, ip4Len int) (ip4BasePos, ip6BasePos, end, size uintptr) {
+	ip4BasePos = ngx_align(base, ngx_cacheline_size)
+	ip6BasePos = ngx_align(ip4BasePos+uintptr(ip6Len), ngx_cacheline_size)
+	end = ngx_align(ip6BasePos+uintptr(ip4Len), ngx_cacheline_size)
+	size = ngx_align(end, pageSize)
+	return
 }
 
 type mutex C.ngx_ip_blocker_mutex_st
@@ -131,6 +141,10 @@ func (rw *rwLock) Unlock() {
 	w.Unlock()
 }
 
+func init() {
+	pageSize = uintptr(os.Getpagesize())
+}
+
 func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
@@ -187,12 +201,7 @@ func main() {
 	ip4s := &ipSearcher{net.IPv4len, nil}
 	ip6s := &ipSearcher{net.IPv6len, nil}
 
-	pageSize := uintptr(os.Getpagesize())
-
-	ip4BasePos := ngx_align(headerSize, ngx_cacheline_size)
-	ip6BasePos := ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
-	end := ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
-	size := ngx_align(end, pageSize)
+	ip4BasePos, ip6BasePos, end, size := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs))
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 		panic(err)
@@ -363,19 +372,13 @@ func main() {
 			panic(err)
 		}
 
-		ip4BasePos2 := ngx_align(headerSize, ngx_cacheline_size)
-		ip6BasePos2 := ngx_align(ip4BasePos2+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
-		end2 := ngx_align(ip6BasePos2+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
-		size2 := ngx_align(end2, pageSize)
+		ip4BasePos2, ip6BasePos2, end2, size2 := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs))
 
 		if end2 > end {
 			end = end2
 		}
 
-		ip4BasePos = ngx_align(end, ngx_cacheline_size)
-		ip6BasePos = ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
-		end = ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
-		size = ngx_align(end, pageSize)
+		ip4BasePos, ip6BasePos, end, size = calculateOffsets(end, len(ip4s.IPs), len(ip6s.IPs))
 
 		if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 			panic(err)
