@@ -187,9 +187,12 @@ func main() {
 	ip4s := &ipSearcher{net.IPv4len, nil}
 	ip6s := &ipSearcher{net.IPv6len, nil}
 
+	pageSize := uintptr(os.Getpagesize())
+
 	ip4BasePos := ngx_align(headerSize, ngx_cacheline_size)
 	ip6BasePos := ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
-	size := ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+	end := ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+	size := ngx_align(end, pageSize)
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 		panic(err)
@@ -362,15 +365,17 @@ func main() {
 
 		ip4BasePos2 := ngx_align(headerSize, ngx_cacheline_size)
 		ip6BasePos2 := ngx_align(ip4BasePos2+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
-		size2 := ngx_align(ip6BasePos2+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+		end2 := ngx_align(ip6BasePos2+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+		size2 := ngx_align(end2, pageSize)
 
-		if size2 > size {
-			size = size2
+		if end2 > end {
+			end = end2
 		}
 
-		ip4BasePos = ngx_align(size, ngx_cacheline_size)
+		ip4BasePos = ngx_align(end, ngx_cacheline_size)
 		ip6BasePos = ngx_align(ip4BasePos+uintptr(len(ip4s.IPs)), ngx_cacheline_size)
-		size = ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+		end = ngx_align(ip6BasePos+uintptr(len(ip6s.IPs)), ngx_cacheline_size)
+		size = ngx_align(end, pageSize)
 
 		if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 			panic(err)
@@ -425,6 +430,7 @@ func main() {
 			panic(err)
 		}
 
+		end = end2
 		size = size2
 
 		addr, err = C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
