@@ -185,10 +185,10 @@ func main() {
 
 	lock.Lock()
 
-	header.ip4.base = C.off_t(ip4BasePos)
+	header.ip4.base = C.ssize_t(ip4BasePos)
 	header.ip4.len = C.size_t(len(ip4s.IPs))
 
-	header.ip6.base = C.off_t(ip6BasePos)
+	header.ip6.base = C.ssize_t(ip6BasePos)
 	header.ip6.len = C.size_t(len(ip6s.IPs))
 
 	ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
@@ -338,10 +338,10 @@ func main() {
 
 		lock.Lock()
 
-		header.ip4.base = C.off_t(ip4BasePos)
+		header.ip4.base = C.ssize_t(ip4BasePos)
 		header.ip4.len = C.size_t(len(ip4s.IPs))
 
-		header.ip6.base = C.off_t(ip6BasePos)
+		header.ip6.base = C.ssize_t(ip6BasePos)
 		header.ip6.len = C.size_t(len(ip6s.IPs))
 
 		atomic.AddUint32((*uint32)(&header.revision), 1)
@@ -356,8 +356,8 @@ func main() {
 
 		lock.Lock()
 
-		header.ip4.base = C.off_t(ip4BasePos2)
-		header.ip6.base = C.off_t(ip6BasePos2)
+		header.ip4.base = C.ssize_t(ip4BasePos2)
+		header.ip6.base = C.ssize_t(ip6BasePos2)
 
 		atomic.AddUint32((*uint32)(&header.revision), 1)
 
