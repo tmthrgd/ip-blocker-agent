@@ -241,6 +241,8 @@ func main() {
 
 	stdin := bufio.NewScanner(os.Stdin)
 
+	var batch bool
+
 	for stdin.Scan() {
 		line := stdin.Text()
 		if len(line) == 0 {
@@ -261,6 +263,20 @@ func main() {
 				fmt.Printf("invalid input: %s\n", line)
 				continue
 			}
+		case 'b':
+			fallthrough
+		case 'B':
+			if len(line) != 1 && !strings.EqualFold(line, "batch") {
+				fmt.Printf("invalid input: %s\n", line)
+				continue
+			}
+
+			if batch {
+				batch = false
+			} else {
+				batch = true
+				continue
+			}
 		case 'q':
 			fallthrough
 		case 'Q':
@@ -275,10 +291,13 @@ func main() {
 			continue
 		}
 
-		if line[0] == '!' {
+		switch line[0] {
+		case 'b':
+		case 'B':
+		case '!':
 			ip4s.Clear()
 			ip6s.Clear()
-		} else {
+		default:
 			if strings.Contains(line[1:], "/") {
 				ip, ipnet, err := net.ParseCIDR(line[1:])
 				if err != nil {
@@ -331,6 +350,10 @@ func main() {
 					}
 				}
 			}
+		}
+
+		if batch {
+			continue
 		}
 
 		if _, err := C.munmap(addr, C.size_t(size)); err != nil {
