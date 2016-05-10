@@ -227,6 +227,15 @@ func main() {
 				fmt.Printf("invalid input: %s\n", line)
 				continue
 			}
+		case 'q':
+			fallthrough
+		case 'Q':
+			if len(line) == 1 || strings.EqualFold(line, "quit") {
+				return
+			}
+
+			fmt.Printf("invalid input: %s\n", line)
+			continue
 		default:
 			fmt.Printf("invalid operation: %c\n", line[0])
 			continue
