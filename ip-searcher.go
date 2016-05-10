@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"net"
+	"os"
 	"sort"
 )
 
@@ -117,5 +118,9 @@ func (p *ipSearcher) Remove(ip net.IP) bool {
 }
 
 func (p *ipSearcher) Clear() {
-	p.IPs = nil
+	if cap(p.IPs) <= os.Getpagesize() {
+		p.IPs = p.IPs[:0]
+	} else {
+		p.IPs = nil
+	}
 }
