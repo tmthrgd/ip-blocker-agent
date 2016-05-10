@@ -197,6 +197,8 @@ func main() {
 	ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
 	copy(ip6Base[:len(ip6s.IPs):size-ip6BasePos], ip6s.IPs)
 
+	atomic.AddUint32((*uint32)(&header.revision), 1)
+
 	lock.Unlock()
 
 	fmt.Printf("mapped %d bytes to %x\n", size, addr)
@@ -342,6 +344,8 @@ func main() {
 		header.ip6.base = C.off_t(ip6BasePos)
 		header.ip6.len = C.size_t(len(ip6s.IPs))
 
+		atomic.AddUint32((*uint32)(&header.revision), 1)
+
 		lock.Unlock()
 
 		ip4Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos2))
@@ -354,6 +358,8 @@ func main() {
 
 		header.ip4.base = C.off_t(ip4BasePos2)
 		header.ip6.base = C.off_t(ip6BasePos2)
+
+		atomic.AddUint32((*uint32)(&header.revision), 1)
 
 		lock.Unlock()
 
