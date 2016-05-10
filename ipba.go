@@ -276,19 +276,24 @@ func main() {
 				continue
 			}
 		case 'b':
-			fallthrough
+			if len(line) != 1 && !strings.EqualFold(line, "batch") {
+				fmt.Printf("invalid input: %s\n", line)
+			} else if batch {
+				fmt.Println("already batching operations")
+			}
+
+			batch = true
+			continue
 		case 'B':
 			if len(line) != 1 && !strings.EqualFold(line, "batch") {
 				fmt.Printf("invalid input: %s\n", line)
 				continue
-			}
-
-			if batch {
-				batch = false
-			} else {
-				batch = true
+			} else if !batch {
+				fmt.Println("not batching operations")
 				continue
 			}
+
+			batch = false
 		case 'q':
 			fallthrough
 		case 'Q':
