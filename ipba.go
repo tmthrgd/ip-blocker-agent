@@ -262,36 +262,24 @@ func main() {
 				}
 
 				ip = ip.Mask(ipnet.Mask)
-				ip4 := ip.To4()
+				var ips *ipSearcher
 
-				if ip4 != nil {
+				if ip4 := ip.To4(); ip4 != nil {
 					ip = ip4
+					ips = ip4s
 				} else {
 					ip = ip.To16()
+					ips = ip6s
 				}
 
 				switch line[0] {
 				case '+':
-					var ips []byte
-
 					for ; ipnet.Contains(ip); incIP(ip) {
-						ips = append(ips, ip...)
-					}
-
-					if ip4 != nil {
-						ip4s.UnsortedInsertMany(ips)
-						ip4s.Sort()
-					} else {
-						ip6s.UnsortedInsertMany(ips)
-						ip6s.Sort()
+						ips.Insert(ip)
 					}
 				case '-':
 					for ; ipnet.Contains(ip); incIP(ip) {
-						if ip4 != nil {
-							ip4s.Remove(ip4)
-						} else {
-							ip6s.Remove(ip)
-						}
+						ips.Remove(ip)
 					}
 				}
 			} else {

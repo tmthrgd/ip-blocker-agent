@@ -71,20 +71,6 @@ func (p *ipSearcher) Contains(ip net.IP) bool {
 	return pos*p.Size < len(p.IPs) && bytes.Equal(check, p.IPs[pos*p.Size:(pos+1)*p.Size])
 }
 
-func (p *ipSearcher) UnsortedInsert(ip net.IP) bool {
-	b := p.ipToByte(ip)
-	if b == nil {
-		return false
-	}
-
-	p.IPs = append(p.IPs, b...)
-	return true
-}
-
-func (p *ipSearcher) UnsortedInsertMany(ips []byte) {
-	p.IPs = append(p.IPs, ips...)
-}
-
 func (p *ipSearcher) Insert(ip net.IP) bool {
 	b := p.ipToByte(ip)
 	if b == nil {
