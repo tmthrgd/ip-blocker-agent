@@ -361,6 +361,10 @@ func main() {
 
 		atomic.AddUint32((*uint32)(&header.revision), 1)
 
+		if err = unix.Ftruncate(int(fd), int64(size2)); err != nil {
+			panic(err)
+		}
+
 		lock.Unlock()
 
 		if _, err := C.munmap(addr, C.size_t(size)); err != nil {
@@ -368,10 +372,6 @@ func main() {
 		}
 
 		size = size2
-
-		if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
-			panic(err)
-		}
 
 		addr, err = C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
 		if err != nil {
