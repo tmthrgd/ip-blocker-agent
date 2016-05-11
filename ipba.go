@@ -48,10 +48,11 @@ func incIP(ip net.IP) {
 	}
 }
 
-func calculateOffsets(base uintptr, ip6Len, ip4Len int) (ip4BasePos, ip6BasePos, end, size uintptr) {
+func calculateOffsets(base uintptr, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size uintptr) {
 	ip4BasePos = ngx_align(base, ngx_cacheline_size)
-	ip6BasePos = ngx_align(ip4BasePos+uintptr(ip6Len), ngx_cacheline_size)
-	end = ngx_align(ip6BasePos+uintptr(ip4Len), ngx_cacheline_size)
+	ip6BasePos = ngx_align(ip4BasePos+uintptr(ip4Len), ngx_cacheline_size)
+	ip6rBasePos = ngx_align(ip6BasePos+uintptr(ip6Len), ngx_cacheline_size)
+	end = ngx_align(ip6rBasePos+uintptr(ip6rLen), ngx_cacheline_size)
 	size = ngx_align(end, pageSize)
 	return
 }
@@ -198,10 +199,11 @@ func main() {
 	}()
 	defer unix.Close(int(fd))
 
-	ip4s := &ipSearcher{net.IPv4len, nil}
-	ip6s := &ipSearcher{net.IPv6len, nil}
+	ip4s := newIPSearcher(net.IPv4len, nil)
+	ip6s := newIPSearcher(net.IPv6len, nil)
+	ip6rs := newIPSearcher(64/8, nil)
 
-	ip4BasePos, ip6BasePos, end, size := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs))
+	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs), len(ip6rs.IPs))
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 		panic(err)
@@ -237,11 +239,17 @@ func main() {
 	header.ip6.base = C.ssize_t(ip6BasePos)
 	header.ip6.len = C.size_t(len(ip6s.IPs))
 
+	header.ip6route.base = C.ssize_t(ip6rBasePos)
+	header.ip6route.len = C.size_t(len(ip6rs.IPs))
+
 	ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
 	copy(ip4Base[:len(ip4s.IPs):ip6BasePos-ip4BasePos], ip4s.IPs)
 
 	ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
-	copy(ip6Base[:len(ip6s.IPs):size-ip6BasePos], ip6s.IPs)
+	copy(ip6Base[:len(ip6s.IPs):ip6rBasePos-ip6BasePos], ip6s.IPs)
+
+	ip6rBase := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos))
+	copy(ip6rBase[:len(ip6rs.IPs):size-ip6rBasePos], ip6rs.IPs)
 
 	header.revision = 1
 
@@ -250,6 +258,7 @@ func main() {
 	fmt.Printf("mapped %d bytes to %x\n", size, addr)
 	fmt.Printf("\tIP4 of %d bytes (%d entries) mapped to %x\n", header.ip4.len, ip4s.Len(), uintptr(addr)+uintptr(header.ip4.base))
 	fmt.Printf("\tIP6 of %d bytes (%d entries) mapped to %x\n", header.ip6.len, ip6s.Len(), uintptr(addr)+uintptr(header.ip6.base))
+	fmt.Printf("\tIP6 routes of %d bytes (%d entries) mapped to %x\n", header.ip6route.len, ip6rs.Len(), uintptr(addr)+uintptr(header.ip6route.base))
 
 	stdin := bufio.NewScanner(os.Stdin)
 
@@ -313,6 +322,7 @@ func main() {
 		case '!':
 			ip4s.Clear()
 			ip6s.Clear()
+			ip6rs.Clear()
 		default:
 			if strings.Contains(line[1:], "/") {
 				ip, ipnet, err := net.ParseCIDR(line[1:])
@@ -329,17 +339,22 @@ func main() {
 					ips = ip4s
 				} else {
 					ip = ip.To16()
-					ips = ip6s
+
+					if ones, _ := ipnet.Mask.Size(); ones <= ip6rs.Size*8 {
+						ips = ip6rs
+					} else {
+						ips = ip6s
+					}
 				}
 
 				switch line[0] {
 				case '+':
-					for ; ipnet.Contains(ip); incIP(ip) {
-						ips.Insert(ip)
+					for ; ipnet.Contains(ip); incIP(ip[:ips.Size]) {
+						ips.Insert(ip[:ips.Size])
 					}
 				case '-':
-					for ; ipnet.Contains(ip); incIP(ip) {
-						ips.Remove(ip)
+					for ; ipnet.Contains(ip); incIP(ip[:ips.Size]) {
+						ips.Remove(ip[:ips.Size])
 					}
 				}
 			} else {
@@ -376,13 +391,13 @@ func main() {
 			panic(err)
 		}
 
-		ip4BasePos2, ip6BasePos2, end2, size2 := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs))
+		ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs), len(ip6rs.IPs))
 
 		if end2 > end {
 			end = end2
 		}
 
-		ip4BasePos, ip6BasePos, end, size = calculateOffsets(end, len(ip4s.IPs), len(ip6s.IPs))
+		ip4BasePos, ip6BasePos, ip6rBasePos, end, size = calculateOffsets(end, len(ip4s.IPs), len(ip6s.IPs), len(ip6rs.IPs))
 
 		if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 			panic(err)
@@ -400,7 +415,10 @@ func main() {
 		copy(ip4Base[:len(ip4s.IPs):ip6BasePos-ip4BasePos], ip4s.IPs)
 
 		ip6Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
-		copy(ip6Base[:len(ip6s.IPs):size-ip6BasePos], ip6s.IPs)
+		copy(ip6Base[:len(ip6s.IPs):ip6rBasePos-ip6BasePos], ip6s.IPs)
+
+		ip6rBase = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos))
+		copy(ip6rBase[:len(ip6rs.IPs):size-ip6rBasePos], ip6rs.IPs)
 
 		lock.Lock()
 
@@ -410,6 +428,9 @@ func main() {
 		header.ip6.base = C.ssize_t(ip6BasePos)
 		header.ip6.len = C.size_t(len(ip6s.IPs))
 
+		header.ip6route.base = C.ssize_t(ip6rBasePos)
+		header.ip6route.len = C.size_t(len(ip6rs.IPs))
+
 		header.revision++
 
 		lock.Unlock()
@@ -418,12 +439,16 @@ func main() {
 		copy(ip4Base[:len(ip4s.IPs):ip6BasePos2-ip4BasePos2], ip4s.IPs)
 
 		ip6Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos2))
-		copy(ip6Base[:len(ip6s.IPs):size2-ip6BasePos2], ip6s.IPs)
+		copy(ip6Base[:len(ip6s.IPs):ip6rBasePos2-ip6BasePos2], ip6s.IPs)
+
+		ip6rBase = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos2))
+		copy(ip6rBase[:len(ip6rs.IPs):size2-ip6rBasePos2], ip6rs.IPs)
 
 		lock.Lock()
 
 		header.ip4.base = C.ssize_t(ip4BasePos2)
 		header.ip6.base = C.ssize_t(ip6BasePos2)
+		header.ip6route.base = C.ssize_t(ip6rBasePos2)
 
 		header.revision++
 
@@ -451,6 +476,7 @@ func main() {
 		fmt.Printf("mapped %d bytes to %x\n", size, addr)
 		fmt.Printf("\tIP4 of %d bytes (%d entries) mapped to %x\n", header.ip4.len, ip4s.Len(), uintptr(addr)+uintptr(header.ip4.base))
 		fmt.Printf("\tIP6 of %d bytes (%d entries) mapped to %x\n", header.ip6.len, ip6s.Len(), uintptr(addr)+uintptr(header.ip6.base))
+		fmt.Printf("\tIP6 routes of %d bytes (%d entries) mapped to %x\n", header.ip6route.len, ip6rs.Len(), uintptr(addr)+uintptr(header.ip6route.base))
 	}
 
 	if err = stdin.Err(); err != nil {
