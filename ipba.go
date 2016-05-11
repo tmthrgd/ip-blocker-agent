@@ -201,7 +201,7 @@ func main() {
 
 	ip4s := newIPSearcher(net.IPv4len, nil)
 	ip6s := newIPSearcher(net.IPv6len, nil)
-	ip6rs := newIPSearcher(64/8, nil)
+	ip6rs := newIPSearcher(net.IPv6len/2, nil)
 
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs), len(ip6rs.IPs))
 
