@@ -93,8 +93,7 @@ func main() {
 	 * object  with  the same name will fail (unless O_CREAT was specified, in
 	 * which case a new, distinct object is created).
 	 */
-	_, err := C.shm_unlink(nameC)
-	if err != nil && err != unix.ENOENT {
+	if _, err := C.shm_unlink(nameC); err != nil && err != unix.ENOENT {
 		panic(err)
 	}
 
@@ -113,8 +112,7 @@ func main() {
 		 * object  with  the same name will fail (unless O_CREAT was specified, in
 		 * which case a new, distinct object is created).
 		 */
-		_, err := C.shm_unlink(nameC)
-		if err != nil {
+		if _, err := C.shm_unlink(nameC); err != nil {
 			panic(err)
 		}
 	}()
@@ -308,7 +306,7 @@ func main() {
 			continue
 		}
 
-		if _, err := C.munmap(addr, C.size_t(size)); err != nil {
+		if _, err = C.munmap(addr, C.size_t(size)); err != nil {
 			panic(err)
 		}
 
@@ -379,7 +377,7 @@ func main() {
 
 		lock.Unlock()
 
-		if _, err := C.munmap(addr, C.size_t(size)); err != nil {
+		if _, err = C.munmap(addr, C.size_t(size)); err != nil {
 			panic(err)
 		}
 
