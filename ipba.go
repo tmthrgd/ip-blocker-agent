@@ -7,6 +7,7 @@ package main
 #include <fcntl.h>           // For O_* constants
 #include <sys/stat.h>        // For mode constants
 #include <sys/mman.h>        // For shm_*
+#include <unistd.h>          // For sysconf and _SC_* constants
 
 #include "ngx_ip_blocker_shm.h"
 */
@@ -23,13 +24,12 @@ import (
 	"unsafe"
 )
 
-const (
-	ngx_cacheline_size = 64
+const headerSize = unsafe.Sizeof(C.ngx_ip_blocker_shm_st{})
 
-	headerSize = unsafe.Sizeof(C.ngx_ip_blocker_shm_st{})
+var (
+	cachelineSize uintptr
+	pageSize      uintptr
 )
-
-var pageSize uintptr
 
 /* taken from ngx_config.h */
 func ngx_align(d, a uintptr) uintptr {
@@ -47,16 +47,24 @@ func incIP(ip net.IP) {
 }
 
 func calculateOffsets(base uintptr, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size uintptr) {
-	ip4BasePos = ngx_align(base, ngx_cacheline_size)
-	ip6BasePos = ngx_align(ip4BasePos+uintptr(ip4Len), ngx_cacheline_size)
-	ip6rBasePos = ngx_align(ip6BasePos+uintptr(ip6Len), ngx_cacheline_size)
-	end = ngx_align(ip6rBasePos+uintptr(ip6rLen), ngx_cacheline_size)
+	ip4BasePos = ngx_align(base, cachelineSize)
+	ip6BasePos = ngx_align(ip4BasePos+uintptr(ip4Len), cachelineSize)
+	ip6rBasePos = ngx_align(ip6BasePos+uintptr(ip6Len), cachelineSize)
+	end = ngx_align(ip6rBasePos+uintptr(ip6rLen), cachelineSize)
 	size = ngx_align(end, pageSize)
 	return
 }
 
 func init() {
 	pageSize = uintptr(os.Getpagesize())
+
+	if csize, err := C.sysconf(C._SC_LEVEL1_DCACHE_LINESIZE); err == nil {
+		cachelineSize = uintptr(csize)
+	} else {
+		fmt.Printf("sysconf(_SC_LEVEL1_DCACHE_LINESIZE) = %s\n", err)
+
+		cachelineSize = 64
+	}
 }
 
 func main() {
