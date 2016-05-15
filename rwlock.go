@@ -82,3 +82,33 @@ func (rw *rwLock) Unlock() {
 	w := (*mutex)(&rw.w)
 	w.Unlock()
 }
+
+// RLock locks rw for reading.
+func (rw *rwLock) RLock() {
+	if atomic.AddInt32((*int32)(&rw.reader_count), 1) < 0 {
+		// A writer is pending, wait for it.
+		if _, err := C.sem_wait(&rw.reader_sem); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// RUnlock undoes a single RLock call;
+// it does not affect other simultaneous readers.
+// It is a run-time error if rw is not locked for reading
+// on entry to RUnlock.
+func (rw *rwLock) RUnlock() {
+	if r := atomic.AddInt32((*int32)(&rw.reader_count), -1); r < 0 {
+		if r+1 == 0 || r+1 == -C.NGX_IP_BLOCKER_MAX_READERS {
+			panic("sync: RUnlock of unlocked rwLock")
+		}
+
+		// A writer is pending.
+		if atomic.AddInt32((*int32)(&rw.reader_wait), -1) == 0 {
+			// The last reader unblocks the writer.
+			if _, err := C.sem_post(&rw.writer_sem); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
