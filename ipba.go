@@ -71,9 +71,6 @@ func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
 
-	var whitelist bool
-	flag.BoolVar(&whitelist, "whitelist", false, "operate in whitelist mode")
-
 	flag.Parse()
 
 	if len(name) == 0 {
@@ -143,12 +140,6 @@ func main() {
 	lock := (*rwLock)(&header.lock)
 
 	lock.Create()
-
-	if whitelist {
-		header.whitelist = 1
-	} else {
-		header.whitelist = 0
-	}
 
 	lock.Lock()
 
