@@ -45,3 +45,8 @@ Block all Tor Exit Nodes:
 ```
 cat <(echo b && curl https://check.torproject.org/exit-addresses | grep ExitAddress | cut -d ' ' -f2 | awk '$0="+"$0' && echo B) /dev/stdin | ip-blocker-agent
 ```
+
+## License
+
+Unless otherwise noted, the ip-blocker-agent source files are distributed under the Modified BSD License
+found in the LICENSE file.
