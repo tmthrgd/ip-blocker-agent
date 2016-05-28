@@ -34,9 +34,9 @@ the interface identifier.
 
 General unicast address format (routing prefix size varies)
 
-| bits  | 48 (or more)   | 16 (or fewer) | 64                   |
-|:-----:|:--------------:|:-------------:|:--------------------:|
-| field | routing prefix | subnet id     | interface identifier |
+| bits      | 48 (or more)   | 16 (or fewer) | 64                   |
+|:---------:|:--------------:|:-------------:|:--------------------:|
+| **field** | routing prefix | subnet id     | interface identifier |
 
 ## Tips and Tricks:
 
