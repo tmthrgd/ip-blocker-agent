@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"sync"
 	"unsafe"
 
@@ -74,7 +73,7 @@ func calculateOffsets(base uintptr, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip
 }
 
 func init() {
-	pageSize = uintptr(os.Getpagesize())
+	pageSize = uintptr(unix.Getpagesize())
 
 	if csize, err := C.sysconf(C._SC_LEVEL1_DCACHE_LINESIZE); err == nil {
 		cachelineSize = uintptr(csize)
