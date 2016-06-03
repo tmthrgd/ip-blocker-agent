@@ -288,7 +288,7 @@ func (b *IPBlocker) commit() error {
 		return err
 	}
 
-	addr, err = C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(b.fd), 0)
+	addr, err = C.mmap(nil, C.size_t(size2), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(b.fd), 0)
 	if err != nil {
 		return err
 	}
