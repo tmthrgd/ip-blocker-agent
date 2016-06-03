@@ -2,7 +2,6 @@ package blocker
 
 import (
 	"bytes"
-	"net"
 	"sort"
 )
 
@@ -11,6 +10,8 @@ type ipSearcher struct {
 	IPs  []byte
 
 	Compare func(a, b []byte) int
+
+	buffer []byte
 }
 
 func newIPSearcher(size int, compare func(a, b []byte) int) *ipSearcher {
@@ -22,6 +23,8 @@ func newIPSearcher(size int, compare func(a, b []byte) int) *ipSearcher {
 		Size: size,
 
 		Compare: compare,
+
+		buffer: make([]byte, size),
 	}
 }
 
@@ -34,11 +37,9 @@ func (p *ipSearcher) Less(i, j int) bool {
 }
 
 func (p *ipSearcher) Swap(i, j int) {
-	var tmp [net.IPv6len]byte
-
-	copy(tmp[:], p.IPs[i*p.Size:(i+1)*p.Size])
+	copy(p.buffer, p.IPs[i*p.Size:(i+1)*p.Size])
 	copy(p.IPs[i*p.Size:(i+1)*p.Size], p.IPs[j*p.Size:(j+1)*p.Size])
-	copy(p.IPs[j*p.Size:(j+1)*p.Size], tmp[:])
+	copy(p.IPs[j*p.Size:(j+1)*p.Size], p.buffer)
 }
 
 func (p *ipSearcher) Sort() {
