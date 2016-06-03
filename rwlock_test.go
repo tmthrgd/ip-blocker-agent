@@ -89,12 +89,12 @@ func HammerRWLock(gomaxprocs, numReaders, numIterations int) {
 	var rw rwLock
 	rw.Create()
 	cdone := make(chan bool)
-	go writer(&rw, num_iterations, &activity, cdone)
+	go writer(&rw, numIterations, &activity, cdone)
 	var i int
 	for i = 0; i < numReaders/2; i++ {
 		go reader(&rw, numIterations, &activity, cdone)
 	}
-	go writer(&rw, num_iterations, &activity, cdone)
+	go writer(&rw, numIterations, &activity, cdone)
 	for ; i < numReaders; i++ {
 		go reader(&rw, numIterations, &activity, cdone)
 	}
