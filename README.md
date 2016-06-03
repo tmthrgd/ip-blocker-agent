@@ -3,6 +3,10 @@
 ip-blocker-agent is the other half of
 [tmthrgd/nginx-ip-blocker](https://github.com/tmthrgd/nginx-ip-blocker).
 
+Look at [the documentation](https://godoc.org/github.com/tmthrgd/ip-blocker-agent) and
+[the agent program](https://github.com/tmthrgd/ip-blocker-agent/blob/master/ip-blocker-agent/agent.go)
+to see how create a blocklist and update it from within another program.
+
 ## Download:
 
 ```
