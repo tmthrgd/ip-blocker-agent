@@ -146,11 +146,7 @@ func New(name string, perms int) (*IPBlocker, error) {
 		return nil, err
 	}
 
-	ip4s := newIPSearcher(net.IPv4len, nil)
-	ip6s := newIPSearcher(net.IPv6len, nil)
-	ip6rs := newIPSearcher(net.IPv6len/2, nil)
-
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs), len(ip6rs.IPs))
+	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, 0, 0, 0)
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
 		return nil, err
@@ -169,22 +165,8 @@ func New(name string, perms int) (*IPBlocker, error) {
 	lock.Lock()
 
 	header.ip4.base = C.ssize_t(ip4BasePos)
-	header.ip4.len = C.size_t(len(ip4s.IPs))
-
 	header.ip6.base = C.ssize_t(ip6BasePos)
-	header.ip6.len = C.size_t(len(ip6s.IPs))
-
 	header.ip6route.base = C.ssize_t(ip6rBasePos)
-	header.ip6route.len = C.size_t(len(ip6rs.IPs))
-
-	ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
-	copy(ip4Base[:len(ip4s.IPs):ip6BasePos-ip4BasePos], ip4s.IPs)
-
-	ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
-	copy(ip6Base[:len(ip6s.IPs):ip6rBasePos-ip6BasePos], ip6s.IPs)
-
-	ip6rBase := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos))
-	copy(ip6rBase[:len(ip6rs.IPs):size-ip6rBasePos], ip6rs.IPs)
 
 	header.revision = 1
 
@@ -195,9 +177,9 @@ func New(name string, perms int) (*IPBlocker, error) {
 
 		fd: int(fd),
 
-		ip4s:  ip4s,
-		ip6s:  ip6s,
-		ip6rs: ip6rs,
+		ip4s:  newIPSearcher(net.IPv4len, nil),
+		ip6s:  newIPSearcher(net.IPv6len, nil),
+		ip6rs: newIPSearcher(net.IPv6len/2, nil),
 
 		addr: addr,
 
