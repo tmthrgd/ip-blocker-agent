@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"unsafe"
 
@@ -550,9 +549,12 @@ func (b *IPBlocker) String() string {
 
 	header := (*C.ngx_ip_blocker_shm_st)(b.addr)
 
-	hdr := fmt.Sprintf("mapped %d bytes to %x", b.size, b.addr)
-	ip4 := fmt.Sprintf("\tIP4 of %d bytes (%d entries) mapped to %x", header.ip4.len, b.ip4s.Len(), uintptr(b.addr)+uintptr(header.ip4.base))
-	ip6 := fmt.Sprintf("\tIP6 of %d bytes (%d entries) mapped to %x", header.ip6.len, b.ip6s.Len(), uintptr(b.addr)+uintptr(header.ip6.base))
-	ip6r := fmt.Sprintf("\tIP6 routes of %d bytes (%d entries) mapped to %x", header.ip6route.len, b.ip6rs.Len(), uintptr(b.addr)+uintptr(header.ip6route.base))
-	return strings.Join([]string{hdr, ip4, ip6, ip6r}, "\n")
+	return fmt.Sprintf("mapped %d bytes to %x\n"+
+		"\tIP4 of %d bytes (%d entries) mapped to %x\n"+
+		"\tIP6 of %d bytes (%d entries) mapped to %x\n"+
+		"\tIP6 routes of %d bytes (%d entries) mapped to %x",
+		b.size, b.addr,
+		header.ip4.len, b.ip4s.Len(), uintptr(b.addr)+uintptr(header.ip4.base),
+		header.ip6.len, b.ip6s.Len(), uintptr(b.addr)+uintptr(header.ip6.base),
+		header.ip6route.len, b.ip6rs.Len(), uintptr(b.addr)+uintptr(header.ip6route.base))
 }
