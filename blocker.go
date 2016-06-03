@@ -333,12 +333,14 @@ func (b *IPBlocker) doInsertRemove(ip net.IP, insert bool) error {
 		} else {
 			b.ip4s.Remove(ip4)
 		}
-	} else {
+	} else if ip6 := ip.To16(); ip6 != nil {
 		if insert {
-			b.ip6s.Insert(ip.To16())
+			b.ip6s.Insert(ip6)
 		} else {
-			b.ip6s.Remove(ip.To16())
+			b.ip6s.Remove(ip6)
 		}
+	} else {
+		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
 	if b.batching {
@@ -376,20 +378,26 @@ func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool
 		return ErrClosed
 	}
 
-	ip = ip.Mask(ipnet.Mask)
+	masked := ip.Mask(ipnet.Mask)
+	if masked == nil {
+		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
+	}
+
 	var ips *ipSearcher
 
-	if ip4 := ip.To4(); ip4 != nil {
+	if ip4 := masked.To4(); ip4 != nil {
 		ip = ip4
 		ips = b.ip4s
-	} else {
-		ip = ip.To16()
+	} else if ip6 := masked.To16(); ip6 != nil {
+		ip = ip6
 
 		if ones, _ := ipnet.Mask.Size(); ones <= b.ip6rs.Size*8 {
 			ips = b.ip6rs
 		} else {
 			ips = b.ip6s
 		}
+	} else {
+		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
 	if insert {
