@@ -45,12 +45,12 @@ var (
 	// ErrAlreadyBatching will be returned on attempts to call
 	// (*IPBlocker).Batch() when the *IPBlocker is already
 	// batching.
-	ErrAlreadyBatching = errors.New("Batch has already been called")
+	ErrAlreadyBatching = errors.New("already batching")
 
 	// ErrNotBatching will be returned on attempts to call
 	// (*IPBlocker).Commit() when (*IPBlocker).Batch() has
 	// not previously been called.
-	ErrNotBatching = errors.New("Batch must be called before using this method")
+	ErrNotBatching = errors.New("not batching")
 )
 
 const headerSize = unsafe.Sizeof(C.ngx_ip_blocker_shm_st{})
