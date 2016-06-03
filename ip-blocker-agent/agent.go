@@ -12,17 +12,34 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	blocker "github.com/tmthrgd/ip-blocker-agent"
 )
 
+type octalValue int
+
+func (o *octalValue) Set(s string) error {
+	v, err := strconv.ParseInt(s, 8, 64)
+	*o = octalValue(v)
+	return err
+}
+
+func (o *octalValue) Get() interface{} {
+	return int(*o)
+}
+
+func (o *octalValue) String() string {
+	return fmt.Sprintf("%#o", *o)
+}
+
 func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
 
-	var perms int
-	flag.IntVar(&perms, "perms", 0600, "permissions")
+	perms := 0600
+	flag.Var((*octalValue)(&perms), "perms", "permissions")
 
 	flag.Parse()
 
