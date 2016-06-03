@@ -135,12 +135,12 @@ func New(name string, perms int) (*IPBlocker, error) {
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, len(ip4s.IPs), len(ip6s.IPs), len(ip6rs.IPs))
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	header := (*C.ngx_ip_blocker_shm_st)(addr)
