@@ -319,7 +319,7 @@ func (b *IPBlocker) Commit() error {
 	return b.commit()
 }
 
-func (b *IPBlocker) doOp(ip net.IP, insert bool) error {
+func (b *IPBlocker) doInsertRemove(ip net.IP, insert bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -355,7 +355,7 @@ func (b *IPBlocker) doOp(ip net.IP, insert bool) error {
 //
 // Will fail if Closed() has already been called.
 func (b *IPBlocker) Insert(ip net.IP) error {
-	return b.doOp(ip, true)
+	return b.doInsertRemove(ip, true)
 }
 
 // Removes a single IP address from the blocklist.
@@ -365,10 +365,10 @@ func (b *IPBlocker) Insert(ip net.IP) error {
 //
 // Will fail if Closed() has already been called.
 func (b *IPBlocker) Remove(ip net.IP) error {
-	return b.doOp(ip, false)
+	return b.doInsertRemove(ip, false)
 }
 
-func (b *IPBlocker) doRangeOp(ip net.IP, ipnet *net.IPNet, insert bool) error {
+func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -416,7 +416,7 @@ func (b *IPBlocker) doRangeOp(ip net.IP, ipnet *net.IPNet, insert bool) error {
 //
 // Will fail if Closed() has already been called.
 func (b *IPBlocker) InsertRange(ip net.IP, ipnet *net.IPNet) error {
-	return b.doRangeOp(ip, ipnet, true)
+	return b.doInsertRemoveRange(ip, ipnet, true)
 }
 
 // Removes an IP address range into the blocklist.
@@ -426,7 +426,7 @@ func (b *IPBlocker) InsertRange(ip net.IP, ipnet *net.IPNet) error {
 //
 // Will fail if Closed() has already been called.
 func (b *IPBlocker) RemoveRange(ip net.IP, ipnet *net.IPNet) error {
-	return b.doRangeOp(ip, ipnet, false)
+	return b.doInsertRemoveRange(ip, ipnet, false)
 }
 
 // Removes all IP addresses and ranges from the blocklist.
