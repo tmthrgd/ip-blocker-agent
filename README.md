@@ -6,14 +6,16 @@ ip-blocker-agent is the other half of
 ## Download:
 
 ```
-go get github.com/tmthrgd/ip-blocker-agent && go install github.com/tmthrgd/ip-blocker-agent
+go get -u github.com/tmthrgd/ip-blocker-agent/...
 ```
 
 ## Run:
 
-ip-blocker-agent only accepts one flag:
+ip-blocker-agent accepts two flags:
 
 -name which defaults to '/ngx-ip-blocker' and specifies the name of the shared memory.
+
+-perms which defaults to 0600 and allows the shared memory permissions to be specified.
 
 ## User interface (on stdin):
 

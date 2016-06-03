@@ -4,7 +4,7 @@
 
 // GOMAXPROCS=10 go test
 
-package main
+package blocker
 
 import (
 	"fmt"
