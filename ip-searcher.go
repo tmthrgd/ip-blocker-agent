@@ -3,7 +3,6 @@ package blocker
 import (
 	"bytes"
 	"net"
-	"os"
 	"sort"
 )
 
@@ -114,7 +113,7 @@ func (p *ipSearcher) Remove(b []byte) bool {
 }
 
 func (p *ipSearcher) Clear() {
-	if cap(p.IPs) <= os.Getpagesize() {
+	if cap(p.IPs) <= int(pageSize) {
 		p.IPs = p.IPs[:0]
 	} else {
 		p.IPs = nil
