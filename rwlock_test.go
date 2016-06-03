@@ -52,8 +52,8 @@ func TestParallelReaders(t *testing.T) {
 	doTestParallelReaders(4, 2)
 }
 
-func reader(rw *rwLock, num_iterations int, activity *int32, cdone chan bool) {
-	for i := 0; i < num_iterations; i++ {
+func reader(rw *rwLock, numIterations int, activity *int32, cdone chan bool) {
+	for i := 0; i < numIterations; i++ {
 		rw.RLock()
 		n := atomic.AddInt32(activity, 1)
 		if n < 1 || n >= 10000 {
@@ -67,8 +67,8 @@ func reader(rw *rwLock, num_iterations int, activity *int32, cdone chan bool) {
 	cdone <- true
 }
 
-func writer(rw *rwLock, num_iterations int, activity *int32, cdone chan bool) {
-	for i := 0; i < num_iterations; i++ {
+func writer(rw *rwLock, numIterations int, activity *int32, cdone chan bool) {
+	for i := 0; i < numIterations; i++ {
 		rw.Lock()
 		n := atomic.AddInt32(activity, 10000)
 		if n != 10000 {
@@ -82,7 +82,7 @@ func writer(rw *rwLock, num_iterations int, activity *int32, cdone chan bool) {
 	cdone <- true
 }
 
-func HammerRWLock(gomaxprocs, numReaders, num_iterations int) {
+func HammerRWLock(gomaxprocs, numReaders, numIterations int) {
 	runtime.GOMAXPROCS(gomaxprocs)
 	// Number of active readers + 10000 * number of active writers.
 	var activity int32
@@ -92,11 +92,11 @@ func HammerRWLock(gomaxprocs, numReaders, num_iterations int) {
 	go writer(&rw, num_iterations, &activity, cdone)
 	var i int
 	for i = 0; i < numReaders/2; i++ {
-		go reader(&rw, num_iterations, &activity, cdone)
+		go reader(&rw, numIterations, &activity, cdone)
 	}
 	go writer(&rw, num_iterations, &activity, cdone)
 	for ; i < numReaders; i++ {
-		go reader(&rw, num_iterations, &activity, cdone)
+		go reader(&rw, numIterations, &activity, cdone)
 	}
 	// Wait for the 2 writers and all readers to finish.
 	for i := 0; i < 2+numReaders; i++ {
@@ -199,7 +199,7 @@ func benchmarkRWLock(b *testing.B, localWork, writeRatio int) {
 				rw.Unlock()
 			} else {
 				rw.RLock()
-				for i := 0; i != localWork; i += 1 {
+				for i := 0; i != localWork; i++ {
 					foo *= 2
 					foo /= 2
 				}
