@@ -3,6 +3,7 @@
 // Modified BSD License license that can be found in
 // the LICENSE file.
 
+// An efficient shared memory IP blocking system for nginx.
 package main
 
 import (
