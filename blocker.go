@@ -32,10 +32,6 @@ import (
 )
 
 var (
-	// ErrUnkownName is returned from Unlink when the
-	// shared memory does not exist.
-	ErrUnkownName = unix.ENOENT
-
 	// ErrClosed will be returned on attempts to call
 	// methods after (*IPBlocker).Close() has been called.
 	ErrClosed = errors.New("shared memory closed")
@@ -92,6 +88,13 @@ func incIP(ip net.IP) {
 			break
 		}
 	}
+}
+
+// IsNotExist returns a boolean indicating whether the
+// error is known to report that a named shared memory
+// region does not exist.
+func IsNotExist(err error) bool {
+	return err == unix.ENOENT
 }
 
 // Unlink removes the previously created blocker.

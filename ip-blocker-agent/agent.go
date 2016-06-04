@@ -48,7 +48,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := blocker.Unlink(name); err != nil && err != blocker.ErrUnkownName {
+	if err := blocker.Unlink(name); err != nil && !blocker.IsNotExist(err) {
 		panic(err)
 	}
 
