@@ -107,8 +107,6 @@ func Unlink(name string) error {
 
 // IPBlocker is an IP blocker shared memory instance.
 type IPBlocker struct {
-	name string
-
 	file *os.File
 
 	ip4s  *binarySearcher
@@ -169,8 +167,6 @@ func New(name string, perms int) (*IPBlocker, error) {
 	lock.Unlock()
 
 	return &IPBlocker{
-		name: name,
-
 		file: file,
 
 		ip4s:  newBinarySearcher(net.IPv4len, nil),
@@ -527,14 +523,14 @@ func (b *IPBlocker) Unlink() error {
 	defer b.mu.Unlock()
 
 	if b.closed {
-		return Unlink(b.name)
+		return Unlink(b.file.Name())
 	}
 
 	if err := b.close(); err != nil {
 		return err
 	}
 
-	return Unlink(b.name)
+	return Unlink(b.file.Name())
 }
 
 // IsBatching returns a boolean indicating whether the
