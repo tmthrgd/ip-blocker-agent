@@ -29,8 +29,6 @@ import (
 	"os"
 	"sync"
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 var (
@@ -71,7 +69,7 @@ func calculateOffsets(base uintptr, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip
 }
 
 func init() {
-	pageSize = uintptr(unix.Getpagesize())
+	pageSize = uintptr(os.Getpagesize())
 
 	if csize, err := C.sysconf(C._SC_LEVEL1_DCACHE_LINESIZE); err == nil {
 		cachelineSize = uintptr(csize)
