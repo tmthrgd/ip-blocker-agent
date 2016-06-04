@@ -41,6 +41,11 @@ func main() {
 	perms := 0600
 	flag.Var((*octalValue)(&perms), "perms", "permissions")
 
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s [-name <path>] [-perms <perms>] [unlink]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
 
 	if len(name) == 0 {
@@ -48,13 +53,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := blocker.Unlink(name); err != nil && !blocker.IsNotExist(err) {
-		panic(err)
+	switch flag.NArg() {
+	case 0:
+	case 1:
+		if flag.Arg(0) != "unlink" {
+			flag.Usage()
+			os.Exit(1)
+		}
+
+		if err := blocker.Unlink(name); err != nil {
+			if blocker.IsNotExist(err) {
+				fmt.Println(err)
+				os.Exit(1)
+			} else {
+				panic(err)
+			}
+		}
+
+		return
+	default:
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	block, err := blocker.New(name, perms)
 	if err != nil {
-		panic(err)
+		if blocker.IsExist(err) {
+			fmt.Println(err)
+			os.Exit(1)
+		} else {
+			panic(err)
+		}
 	}
 
 	defer block.Unlink()
