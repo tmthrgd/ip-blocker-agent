@@ -47,15 +47,24 @@ func (p *ipSearcher) Sort() {
 }
 
 func (p *ipSearcher) Index(check []byte) int {
+	if len(check) != p.Size {
+		panic("invalid size")
+	}
+
 	return sort.Search(p.Len(), func(i int) bool {
 		return p.Compare(p.IPs[i*p.Size:(i+1)*p.Size], check) >= 0
 	})
 }
 
-func (p *ipSearcher) Search(check []byte) []byte {
-	pos := p.Index(check)
+func (p *ipSearcher) search(check []byte) (pos int, has bool) {
+	pos = p.Index(check)
+	has = pos*p.Size < len(p.IPs) && p.Compare(check, p.IPs[pos*p.Size:(pos+1)*p.Size]) == 0
+	return
+}
 
-	if pos*p.Size < len(p.IPs) && p.Compare(check, p.IPs[pos*p.Size:(pos+1)*p.Size]) == 0 {
+func (p *ipSearcher) Search(check []byte) []byte {
+	pos, has := p.search(check)
+	if has {
 		return p.IPs[pos*p.Size : (pos+1)*p.Size]
 	}
 
@@ -63,27 +72,25 @@ func (p *ipSearcher) Search(check []byte) []byte {
 }
 
 func (p *ipSearcher) Contains(check []byte) bool {
-	return p.Search(check) != nil
+	_, has := p.search(check)
+	return has
 }
 
 func (p *ipSearcher) Insert(b []byte) bool {
-	pos := p.Index(b)
-
-	if pos*p.Size < len(p.IPs) && p.Compare(b, p.IPs[pos*p.Size:(pos+1)*p.Size]) == 0 {
+	pos, has := p.search(b)
+	if has {
 		return false
 	}
 
 	p.IPs = append(p.IPs, b...)
 	copy(p.IPs[(pos+1)*p.Size:], p.IPs[pos*p.Size:])
-	copy(p.IPs[pos*p.Size:], b)
+	copy(p.IPs[pos*p.Size:(pos+1)*p.Size], b)
 	return true
 }
 
 func (p *ipSearcher) Replace(b []byte) bool {
-	pos := p.Index(b)
-
-	if pos*p.Size < len(p.IPs) && p.Compare(b, p.IPs[pos*p.Size:(pos+1)*p.Size]) == 0 {
-		copy(p.IPs[pos*p.Size:], b)
+	if pos, has := p.search(b); has {
+		copy(p.IPs[pos*p.Size:(pos+1)*p.Size], b)
 		return true
 	}
 
@@ -91,26 +98,25 @@ func (p *ipSearcher) Replace(b []byte) bool {
 }
 
 func (p *ipSearcher) InsertOrReplace(b []byte) {
-	pos := p.Index(b)
-
-	if pos*p.Size < len(p.IPs) && p.Compare(b, p.IPs[pos*p.Size:(pos+1)*p.Size]) == 0 {
-		copy(p.IPs[pos*p.Size:], b)
-	} else {
-		p.IPs = append(p.IPs, b...)
-		copy(p.IPs[(pos+1)*p.Size:], p.IPs[pos*p.Size:])
-		copy(p.IPs[pos*p.Size:], b)
+	pos, has := p.search(b)
+	if has {
+		copy(p.IPs[pos*p.Size:(pos+1)*p.Size], b)
+		return
 	}
+
+	p.IPs = append(p.IPs, b...)
+	copy(p.IPs[(pos+1)*p.Size:], p.IPs[pos*p.Size:])
+	copy(p.IPs[pos*p.Size:(pos+1)*p.Size], b)
 }
 
 func (p *ipSearcher) Remove(b []byte) bool {
-	pos := p.Index(b)
-
-	if pos*p.Size >= len(p.IPs) || p.Compare(b, p.IPs[pos*p.Size:(pos+1)*p.Size]) != 0 {
-		return false
+	pos, has := p.search(b)
+	if has {
+		p.IPs = append(p.IPs[:pos*p.Size], p.IPs[(pos+1)*p.Size:]...)
+		return true
 	}
 
-	p.IPs = append(p.IPs[:pos*p.Size], p.IPs[(pos+1)*p.Size:]...)
-	return true
+	return false
 }
 
 func (p *ipSearcher) Clear() {
