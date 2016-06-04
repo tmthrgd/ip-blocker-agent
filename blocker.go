@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 	"unsafe"
 
@@ -126,7 +127,7 @@ func Unlink(name string) error {
 type IPBlocker struct {
 	name string
 
-	fd int
+	file *os.File
 
 	ip4s  *binarySearcher
 	ip6s  *binarySearcher
@@ -157,16 +158,16 @@ func New(name string, perms int) (*IPBlocker, error) {
 		return nil, err
 	}
 
+	file := os.NewFile(uintptr(fd), name)
+
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, 0, 0, 0)
 
-	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
-		unix.Close(int(fd))
+	if err = file.Truncate(int64(size)); err != nil {
 		return nil, err
 	}
 
-	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
+	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(file.Fd()), 0)
 	if err != nil {
-		unix.Close(int(fd))
 		return nil, err
 	}
 
@@ -188,7 +189,7 @@ func New(name string, perms int) (*IPBlocker, error) {
 	return &IPBlocker{
 		name: name,
 
-		fd: int(fd),
+		file: file,
 
 		ip4s:  newBinarySearcher(net.IPv4len, nil),
 		ip6s:  newBinarySearcher(net.IPv6len, nil),
@@ -217,11 +218,11 @@ func (b *IPBlocker) commit() error {
 
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(end, len(b.ip4s.Data), len(b.ip6s.Data), len(b.ip6rs.Data))
 
-	if err := unix.Ftruncate(b.fd, int64(size)); err != nil {
+	if err := b.file.Truncate(int64(size)); err != nil {
 		return err
 	}
 
-	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(b.fd), 0)
+	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(b.file.Fd()), 0)
 	if err != nil {
 		return err
 	}
@@ -270,7 +271,7 @@ func (b *IPBlocker) commit() error {
 
 	header.revision++
 
-	if err = unix.Ftruncate(b.fd, int64(size2)); err != nil {
+	if err = b.file.Truncate(int64(size2)); err != nil {
 		lock.Unlock()
 		return err
 	}
@@ -281,7 +282,7 @@ func (b *IPBlocker) commit() error {
 		return err
 	}
 
-	addr, err = C.mmap(nil, C.size_t(size2), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(b.fd), 0)
+	addr, err = C.mmap(nil, C.size_t(size2), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(b.file.Fd()), 0)
 	if err != nil {
 		return err
 	}
@@ -510,7 +511,7 @@ func (b *IPBlocker) close() error {
 		return err
 	}
 
-	return unix.Close(b.fd)
+	return b.file.Close()
 }
 
 // Close closes the blockers shared memory and

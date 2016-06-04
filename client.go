@@ -20,17 +20,16 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 var errInvalidSharedMem = errors.New("invalid shared memory")
 
 // Client is an IP blocker shared memory client.
 type Client struct {
-	fd int
+	file *os.File
 
 	addr unsafe.Pointer
 	size int64
@@ -51,21 +50,20 @@ func Open(name string) (*Client, error) {
 		return nil, err
 	}
 
-	var stat unix.Stat_t
-	if err = unix.Fstat(int(fd), &stat); err != nil {
-		unix.Close(int(fd))
+	file := os.NewFile(uintptr(fd), name)
+
+	stat, err := file.Stat()
+	if err != nil {
 		return nil, err
 	}
 
-	size := stat.Size
+	size := stat.Size()
 	if size < int64(headerSize) {
-		unix.Close(int(fd))
 		return nil, errInvalidSharedMem
 	}
 
-	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
+	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(file.Fd()), 0)
 	if err != nil {
-		unix.Close(int(fd))
 		return nil, err
 	}
 
@@ -73,7 +71,7 @@ func Open(name string) (*Client, error) {
 	lock := (*rwLock)(&header.lock)
 
 	client := &Client{
-		fd: int(fd),
+		file: file,
 
 		addr: addr,
 		size: size,
@@ -83,20 +81,19 @@ func Open(name string) (*Client, error) {
 
 	client.revision = uint32(header.revision)
 
-	if err = unix.Fstat(int(fd), &stat); err != nil {
+	stat, err = file.Stat()
+	if err != nil {
 		lock.RUnlock()
 
 		C.munmap(addr, C.size_t(size))
-		unix.Close(int(fd))
 		return nil, err
 	}
 
-	if stat.Size != size {
+	if stat.Size() != size {
 		/* shm has changed since we mmaped it (unlikely but possible) */
 
 		/* RUnlock is called inside of remap iff an err is returned */
 		if err := client.remap(); err != nil {
-			unix.Close(int(fd))
 			return nil, err
 		}
 
@@ -106,7 +103,6 @@ func Open(name string) (*Client, error) {
 		lock.RUnlock()
 
 		C.munmap(addr, C.size_t(size))
-		unix.Close(int(fd))
 		return nil, errInvalidSharedMem
 	}
 
@@ -119,17 +115,17 @@ func (c *Client) remap() (err error) {
 	addr, size := c.addr, c.size
 	c.addr, c.size = nil, 0
 
-	var stat unix.Stat_t
-	if err := unix.Fstat(c.fd, &stat); err != nil {
-		goto err
-	}
-
-	c.addr, err = C.mmap(nil, C.size_t(stat.Size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(c.fd), 0)
+	stat, err := c.file.Stat()
 	if err != nil {
 		goto err
 	}
 
-	c.size = stat.Size
+	c.addr, err = C.mmap(nil, C.size_t(stat.Size()), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(c.file.Fd()), 0)
+	if err != nil {
+		goto err
+	}
+
+	c.size = stat.Size()
 
 	if !c.checkSharedMemory() {
 		err = errInvalidSharedMem
@@ -251,13 +247,5 @@ func (c *Client) Close() error {
 		c.size = 0
 	}
 
-	if c.fd != -1 {
-		if err := unix.Close(c.fd); err != nil {
-			return err
-		}
-
-		c.fd = -1
-	}
-
-	return nil
+	return c.file.Close()
 }
