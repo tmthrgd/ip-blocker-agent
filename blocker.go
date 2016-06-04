@@ -117,9 +117,9 @@ type IPBlocker struct {
 
 	fd int
 
-	ip4s  *ipSearcher
-	ip6s  *ipSearcher
-	ip6rs *ipSearcher
+	ip4s  *binarySearcher
+	ip6s  *binarySearcher
+	ip6rs *binarySearcher
 
 	addr unsafe.Pointer
 
@@ -177,9 +177,9 @@ func New(name string, perms int) (*IPBlocker, error) {
 
 		fd: int(fd),
 
-		ip4s:  newIPSearcher(net.IPv4len, nil),
-		ip6s:  newIPSearcher(net.IPv6len, nil),
-		ip6rs: newIPSearcher(net.IPv6len/2, nil),
+		ip4s:  newBinarySearcher(net.IPv4len, nil),
+		ip6s:  newBinarySearcher(net.IPv6len, nil),
+		ip6rs: newBinarySearcher(net.IPv6len/2, nil),
 
 		addr: addr,
 
@@ -195,14 +195,14 @@ func (b *IPBlocker) commit() error {
 		return err
 	}
 
-	ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(headerSize, len(b.ip4s.IPs), len(b.ip6s.IPs), len(b.ip6rs.IPs))
+	ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(headerSize, len(b.ip4s.Data), len(b.ip6s.Data), len(b.ip6rs.Data))
 
 	end := b.end
 	if end2 > end {
 		end = end2
 	}
 
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(end, len(b.ip4s.IPs), len(b.ip6s.IPs), len(b.ip6rs.IPs))
+	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(end, len(b.ip4s.Data), len(b.ip6s.Data), len(b.ip6rs.Data))
 
 	if err := unix.Ftruncate(b.fd, int64(size)); err != nil {
 		return err
@@ -217,37 +217,37 @@ func (b *IPBlocker) commit() error {
 	lock := (*rwLock)(&header.lock)
 
 	ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
-	copy(ip4Base[:len(b.ip4s.IPs):ip6BasePos-ip4BasePos], b.ip4s.IPs)
+	copy(ip4Base[:len(b.ip4s.Data):ip6BasePos-ip4BasePos], b.ip4s.Data)
 
 	ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
-	copy(ip6Base[:len(b.ip6s.IPs):ip6rBasePos-ip6BasePos], b.ip6s.IPs)
+	copy(ip6Base[:len(b.ip6s.Data):ip6rBasePos-ip6BasePos], b.ip6s.Data)
 
 	ip6rBase := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos))
-	copy(ip6rBase[:len(b.ip6rs.IPs):size-ip6rBasePos], b.ip6rs.IPs)
+	copy(ip6rBase[:len(b.ip6rs.Data):size-ip6rBasePos], b.ip6rs.Data)
 
 	lock.Lock()
 
 	header.ip4.base = C.ssize_t(ip4BasePos)
-	header.ip4.len = C.size_t(len(b.ip4s.IPs))
+	header.ip4.len = C.size_t(len(b.ip4s.Data))
 
 	header.ip6.base = C.ssize_t(ip6BasePos)
-	header.ip6.len = C.size_t(len(b.ip6s.IPs))
+	header.ip6.len = C.size_t(len(b.ip6s.Data))
 
 	header.ip6route.base = C.ssize_t(ip6rBasePos)
-	header.ip6route.len = C.size_t(len(b.ip6rs.IPs))
+	header.ip6route.len = C.size_t(len(b.ip6rs.Data))
 
 	header.revision++
 
 	lock.Unlock()
 
 	ip4Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos2))
-	copy(ip4Base[:len(b.ip4s.IPs):ip6BasePos2-ip4BasePos2], b.ip4s.IPs)
+	copy(ip4Base[:len(b.ip4s.Data):ip6BasePos2-ip4BasePos2], b.ip4s.Data)
 
 	ip6Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos2))
-	copy(ip6Base[:len(b.ip6s.IPs):ip6rBasePos2-ip6BasePos2], b.ip6s.IPs)
+	copy(ip6Base[:len(b.ip6s.Data):ip6rBasePos2-ip6BasePos2], b.ip6s.Data)
 
 	ip6rBase = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos2))
-	copy(ip6rBase[:len(b.ip6rs.IPs):size2-ip6rBasePos2], b.ip6rs.IPs)
+	copy(ip6rBase[:len(b.ip6rs.Data):size2-ip6rBasePos2], b.ip6rs.Data)
 
 	lock.Lock()
 
@@ -363,7 +363,7 @@ func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
-	var ips *ipSearcher
+	var ips *binarySearcher
 
 	if ip4 := masked.To4(); ip4 != nil {
 		ip = ip4
@@ -371,7 +371,7 @@ func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool
 	} else if ip6 := masked.To16(); ip6 != nil {
 		ip = ip6
 
-		if ones, _ := ipnet.Mask.Size(); ones <= b.ip6rs.Size*8 {
+		if ones, _ := ipnet.Mask.Size(); ones <= b.ip6rs.Size()*8 {
 			ips = b.ip6rs
 		} else {
 			ips = b.ip6s
@@ -380,13 +380,15 @@ func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
+	size := ips.Size()
+
 	if insert {
-		for ; ipnet.Contains(ip); incIP(ip[:ips.Size]) {
-			ips.Insert(ip[:ips.Size])
+		for ; ipnet.Contains(ip); incIP(ip[:size]) {
+			ips.Insert(ip[:size])
 		}
 	} else {
-		for ; ipnet.Contains(ip); incIP(ip[:ips.Size]) {
-			ips.Remove(ip[:ips.Size])
+		for ; ipnet.Contains(ip); incIP(ip[:size]) {
+			ips.Remove(ip[:size])
 		}
 	}
 
