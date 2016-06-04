@@ -18,7 +18,7 @@ ip-blocker-client accepts one flag:
 ## User interface (on stdin)
 
 192.0.2.0 queries a single IPv4 address.  
-+2001:db8:: queries a single IPv6 address.  
+2001:db8:: queries a single IPv6 address.  
 ? prints information about the shared memory mapping.  
 q quits the program.
 

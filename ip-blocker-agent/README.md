@@ -20,6 +20,10 @@ ip-blocker-agent accepts two flags:
 
 -perms which defaults to 0600 and allows the shared memory permissions to be specified.
 
+ip-blocker-agent has one subcommand:
+
+- unlink which removes a previously created blocklist at the specified name.
+
 ## User interface (on stdin)
 
 +192.0.2.0 add single IPv4 address.  
