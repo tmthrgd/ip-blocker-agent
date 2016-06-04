@@ -37,6 +37,8 @@ type Client struct {
 	mu sync.RWMutex
 
 	revision uint32
+
+	closed bool
 }
 
 // Open returns a new IP blocker shared memory client
@@ -112,6 +114,10 @@ func Open(name string) (*Client, error) {
 
 /* RLock must be held before calling remap */
 func (c *Client) remap() (err error) {
+	if c.closed {
+		panic(ErrClosed)
+	}
+
 	addr, size := c.addr, c.size
 	c.addr, c.size = nil, 0
 
@@ -151,6 +157,10 @@ err:
 }
 
 func (c *Client) checkSharedMemory() bool {
+	if c.closed {
+		panic(ErrClosed)
+	}
+
 	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
 
 	return c.size >= int64(headerSize) &&
@@ -171,6 +181,10 @@ func (c *Client) checkSharedMemory() bool {
 func (c *Client) Contains(ip net.IP) (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
+	if c.closed {
+		return false, ErrClosed
+	}
 
 	if c.addr == nil || c.size < int64(headerSize) {
 		return false, errors.New("invalid state")
@@ -238,6 +252,12 @@ func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if c.closed {
+		return ErrClosed
+	}
+
+	c.closed = true
+
 	if c.addr != nil {
 		if _, err := C.munmap(c.addr, C.size_t(c.size)); err != nil {
 			return err
@@ -256,8 +276,12 @@ func (c *Client) String() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if c.addr == nil || c.size < int64(headerSize) {
+	if c.closed {
 		return "<closed>"
+	}
+
+	if c.addr == nil || c.size < int64(headerSize) {
+		return "<invalid state>"
 	}
 
 	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
