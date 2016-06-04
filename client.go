@@ -143,7 +143,7 @@ err:
 		lock := (*rwLock)(&header.lock)
 		lock.RUnlock()
 	} else {
-		fmt.Println("failed to release read lock")
+		os.Stderr.WriteString("failed to release read lock")
 	}
 
 	C.munmap(addr, C.size_t(size))
