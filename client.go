@@ -249,3 +249,25 @@ func (c *Client) Close() error {
 
 	return c.file.Close()
 }
+
+// String returns a human readable representation of
+// the blocklist state.
+func (c *Client) String() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.addr == nil || c.size < int64(headerSize) {
+		return "<closed>"
+	}
+
+	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+
+	return fmt.Sprintf("mapped %d bytes to %x\n"+
+		"\tIP4 of %d bytes (%d entries) mapped to %x\n"+
+		"\tIP6 of %d bytes (%d entries) mapped to %x\n"+
+		"\tIP6 routes of %d bytes (%d entries) mapped to %x",
+		c.size, c.addr,
+		header.ip4.len, header.ip4.len/net.IPv4len, uintptr(c.addr)+uintptr(header.ip4.base),
+		header.ip6.len, header.ip6.len/net.IPv6len, uintptr(c.addr)+uintptr(header.ip6.base),
+		header.ip6route.len, header.ip6route.len/(net.IPv6len/2), uintptr(c.addr)+uintptr(header.ip6route.base))
+}

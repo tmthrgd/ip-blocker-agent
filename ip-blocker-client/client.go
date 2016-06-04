@@ -40,6 +40,8 @@ func main() {
 
 	defer block.Close()
 
+	fmt.Println(block)
+
 	stdin := bufio.NewScanner(os.Stdin)
 
 	for stdin.Scan() {
@@ -58,6 +60,8 @@ func main() {
 			}
 
 			fmt.Printf("invalid input: %s\n", line)
+		case '?':
+			fmt.Println(block)
 		default:
 			ip := net.ParseIP(line)
 			if ip == nil {
