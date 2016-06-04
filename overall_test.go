@@ -687,7 +687,10 @@ func benchmarkCommit(b *testing.B, extra int) {
 			b.Error(err)
 		}
 
-		if err = blocker.InsertRange(extraIP, &net.IPNet{extraIP, net.CIDRMask(64, 128)}); err != nil {
+		if err = blocker.InsertRange(extraIP, &net.IPNet{
+			IP: extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
 			b.Error(err)
 		}
 	}
