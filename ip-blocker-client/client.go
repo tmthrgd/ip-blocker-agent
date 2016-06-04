@@ -21,10 +21,30 @@ func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
 
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s [-name <path>] [ip-address]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
 
 	if len(name) == 0 {
 		fmt.Println("-name cannot be empty")
+		os.Exit(1)
+	}
+
+	var query net.IP
+
+	switch flag.NArg() {
+	case 0:
+	case 1:
+		query = net.ParseIP(flag.Arg(0))
+		if query == nil {
+			flag.Usage()
+			os.Exit(1)
+		}
+	default:
+		flag.Usage()
 		os.Exit(1)
 	}
 
@@ -39,6 +59,19 @@ func main() {
 	}
 
 	defer block.Close()
+
+	if query != nil {
+		has, err := block.Contains(query)
+		if err != nil {
+			panic(err)
+		}
+
+		if has {
+			os.Exit(0)
+		} else {
+			os.Exit(1)
+		}
+	}
 
 	fmt.Println(block)
 

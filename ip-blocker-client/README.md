@@ -15,6 +15,15 @@ ip-blocker-client accepts one flag:
 
 -name which defaults to '/ngx-ip-blocker' and specifies the name of the shared memory.
 
+ip-blocker-client can be run with a single ip address specified like so:
+
+```
+ip-blocker-client 192.0.2.0
+```
+
+In this case, ip-blocker-client will exit with a status of 0 if the IP address is in the blocklist
+and a status of 1 if it is not.
+
 ## User interface (on stdin)
 
 192.0.2.0 queries a single IPv4 address.  
