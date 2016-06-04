@@ -270,6 +270,11 @@ func (c *Client) Close() error {
 	return c.file.Close()
 }
 
+// Name returns the name of the shared memory.
+func (c *Client) Name() string {
+	return c.file.Name()
+}
+
 // String returns a human readable representation of
 // the blocklist state.
 func (c *Client) String() string {

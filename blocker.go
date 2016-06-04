@@ -542,6 +542,11 @@ func (b *IPBlocker) IsBatching() bool {
 	return !b.closed && b.batching
 }
 
+// Name returns the name of the shared memory.
+func (b *IPBlocker) Name() string {
+	return b.file.Name()
+}
+
 // String returns a human readable representation of
 // the blocklist state.
 func (b *IPBlocker) String() string {
