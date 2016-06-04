@@ -3,7 +3,8 @@
 // Modified BSD License license that can be found in
 // the LICENSE file.
 
-// An efficient shared memory IP blocking system for nginx.
+// Package blocker is an efficient shared memory IP
+// blocking system for nginx.
 //
 // See https://github.com/tmthrgd/nginx-ip-blocker
 package blocker
@@ -54,17 +55,17 @@ var (
 	pageSize      uintptr
 )
 
-/* taken from ngx_config.h */
-func ngx_align(d, a uintptr) uintptr {
+/* ngx_align, taken from ngx_config.h */
+func align(d, a uintptr) uintptr {
 	return (d + (a - 1)) &^ (a - 1)
 }
 
 func calculateOffsets(base uintptr, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size uintptr) {
-	ip4BasePos = ngx_align(base, cachelineSize)
-	ip6BasePos = ngx_align(ip4BasePos+uintptr(ip4Len), cachelineSize)
-	ip6rBasePos = ngx_align(ip6BasePos+uintptr(ip6Len), cachelineSize)
-	end = ngx_align(ip6rBasePos+uintptr(ip6rLen), cachelineSize)
-	size = ngx_align(end, pageSize)
+	ip4BasePos = align(base, cachelineSize)
+	ip6BasePos = align(ip4BasePos+uintptr(ip4Len), cachelineSize)
+	ip6rBasePos = align(ip6BasePos+uintptr(ip6Len), cachelineSize)
+	end = align(ip6rBasePos+uintptr(ip6rLen), cachelineSize)
+	size = align(end, pageSize)
 	return
 }
 
@@ -121,7 +122,7 @@ func Unlink(name string) error {
 	return err
 }
 
-// An IP blocker shared memory instance.
+// IPBlocker is an IP blocker shared memory instance.
 type IPBlocker struct {
 	name string
 
@@ -142,8 +143,8 @@ type IPBlocker struct {
 	batching bool
 }
 
-// Create a new IP blocker shared memory instance with
-// specified name and permissions.
+// New creates a new IP blocker shared memory instance
+// with specified name and permissions.
 //
 // This will fail if a shared memory region has already
 // been created with the same name and not unlinked.
@@ -289,8 +290,8 @@ func (b *IPBlocker) commit() error {
 	return nil
 }
 
-// Ends a batching operation and commits all the changes
-// to shared memory.
+// Commit ends a batching operation and commits all
+// the changes to shared memory.
 //
 // Will fail if Closed() has already been called or
 // if Batch() has not yet been called.
@@ -340,7 +341,8 @@ func (b *IPBlocker) doInsertRemove(ip net.IP, insert bool) error {
 	return b.commit()
 }
 
-// Inserts a single IP address into the blocklist.
+// Insert inserts a single IP address into the
+// blocklist.
 //
 // If presently batching, Insert() will not commit the
 // changes to shared memory.
@@ -350,7 +352,8 @@ func (b *IPBlocker) Insert(ip net.IP) error {
 	return b.doInsertRemove(ip, true)
 }
 
-// Removes a single IP address from the blocklist.
+// Remove removes a single IP address from the
+// blocklist.
 //
 // If presently batching, Insert() will not commit the
 // changes to shared memory.
@@ -409,27 +412,30 @@ func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool
 	return b.commit()
 }
 
-// Inserts an IP address range into the blocklist.
+// InsertRange inserts all IP addresses in a CIDR
+// block into the blocklist.
 //
-// If presently batching, InsertRange() will not commit
-// the changes to shared memory.
+// If presently batching, InsertRange() will not
+// commit the changes to shared memory.
 //
 // Will fail if Closed() has already been called.
 func (b *IPBlocker) InsertRange(ip net.IP, ipnet *net.IPNet) error {
 	return b.doInsertRemoveRange(ip, ipnet, true)
 }
 
-// Removes an IP address range into the blocklist.
+// RemoveRange removes all IP addresses in a CIDR
+// block from the the blocklist.
 //
-// If presently batching, RemoveRange() will not commit
-// the changes to shared memory.
+// If presently batching, RemoveRange() will not
+// commit the changes to shared memory.
 //
 // Will fail if Closed() has already been called.
 func (b *IPBlocker) RemoveRange(ip net.IP, ipnet *net.IPNet) error {
 	return b.doInsertRemoveRange(ip, ipnet, false)
 }
 
-// Removes all IP addresses and ranges from the blocklist.
+// Clear removes all IP addresses and ranges from the
+// blocklist.
 //
 // If presently batching, Clear() will not commit the
 // changes to shared memory.
@@ -454,8 +460,9 @@ func (b *IPBlocker) Clear() error {
 	return b.commit()
 }
 
-// Batches all changes and withholds committing them
-// to the blocklist until Commit() is manually called.
+// Batch beings batching all changes and withholds
+// committing them to shared memory until Commit()
+// is manually called.
 //
 // Will fail if Closed() has already been called or
 // if the blocker is already batching.
@@ -485,7 +492,8 @@ func (b *IPBlocker) close() error {
 	return unix.Close(b.fd)
 }
 
-// Closes the blockers shared memory.
+// Close closes the blockers shared memory and
+// releases the file descriptor.
 func (b *IPBlocker) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -497,7 +505,8 @@ func (b *IPBlocker) Close() error {
 	return b.close()
 }
 
-// Unlinks and closes the blockers shared memory.
+// Unlink removes the blocker and closes the blockers
+// shared memory.
 //
 // Taken from shm_unlink(3):
 // 	The  operation  of shm_unlink() is analogous to unlink(2): it removes a
@@ -521,8 +530,8 @@ func (b *IPBlocker) Unlink() error {
 	return Unlink(b.name)
 }
 
-// Returns true if the blocker is currently
-// batching.
+// IsBatching returns a boolean indicating whether the
+// blocker is currently batching.
 func (b *IPBlocker) IsBatching() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -530,7 +539,7 @@ func (b *IPBlocker) IsBatching() bool {
 	return !b.closed && b.batching
 }
 
-// Returns a human readable representation of
+// String returns a human readable representation of
 // the blocklist state.
 func (b *IPBlocker) String() string {
 	b.mu.Lock()
