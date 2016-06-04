@@ -105,14 +105,20 @@ func testAddress(t *testing.T, addrs ...string) {
 }
 
 func TestIP4(t *testing.T) {
+	t.Parallel()
+
 	testAddress(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1")
 }
 
 func TestIP6(t *testing.T) {
+	t.Parallel()
+
 	testAddress(t, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestMixed(t *testing.T) {
+	t.Parallel()
+
 	testAddress(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1", "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
@@ -188,6 +194,8 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 }
 
 func TestIP4Range(t *testing.T) {
+	t.Parallel()
+
 	testRange(t, []string{"192.0.2.0/24"}, "192.0.2.0", "192.0.2.1")
 	testRange(t, []string{"198.51.100.0/24"}, "198.51.100.0", "198.51.100.128")
 	testRange(t, []string{"203.0.113.0/24"}, "203.0.113.0", "203.0.113.255")
@@ -195,15 +203,21 @@ func TestIP4Range(t *testing.T) {
 }
 
 func TestIP6Range(t *testing.T) {
+	t.Parallel()
+
 	testRange(t, []string{"2001:db8::/112"}, "2001:db8::", "2001:db8::1", "2001:db8::f")
 }
 
 func TestIP6RouteRange(t *testing.T) {
+	t.Parallel()
+
 	testRange(t, []string{"2001:db8::/64"}, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 	testRange(t, []string{"2001:db8::/58"}, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestMixedRange(t *testing.T) {
+	t.Parallel()
+
 	testRange(t, []string{"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "2001:db8::/112", "::/64", "1::/58"}, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.128", "203.0.113.0", "203.0.113.255", "2001:db8::", "2001:db8::1", "2001:db8::f", "::", "::1", "::f", "::dead:beef", "1::", "1::1", "1::f", "1::dead:beef")
 }
 
@@ -263,18 +277,26 @@ func testClear(t *testing.T, addrs ...string) {
 }
 
 func TestClearIP4(t *testing.T) {
+	t.Parallel()
+
 	testClear(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1")
 }
 
 func TestClearIP6(t *testing.T) {
+	t.Parallel()
+
 	testClear(t, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestClearMixed(t *testing.T) {
+	t.Parallel()
+
 	testClear(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1", "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestBatch(t *testing.T) {
+	t.Parallel()
+
 	blocker, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
@@ -306,6 +328,8 @@ func TestBatch(t *testing.T) {
 }
 
 func TestBlockerClose(t *testing.T) {
+	t.Parallel()
+
 	blocker, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
@@ -325,6 +349,8 @@ func TestBlockerClose(t *testing.T) {
 }
 
 func TestClientClose(t *testing.T) {
+	t.Parallel()
+
 	blocker, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
@@ -345,6 +371,8 @@ func TestClientClose(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
+	t.Parallel()
+
 	blocker, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
