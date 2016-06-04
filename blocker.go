@@ -355,6 +355,13 @@ func (b *IPBlocker) Insert(ip net.IP) error {
 // Remove removes a single IP address from the
 // blocklist.
 //
+// If the IP address is covered by a range added with
+// (*IPBlocker).InsertRange that was larger than /64
+// then calling (*IPBlocker).Remove will fail to
+// remove the IP address. Instead,
+// (*IPBlocker).RemoveRange must be used to remove the
+// entire range.
+//
 // If presently batching, Insert() will not commit the
 // changes to shared memory.
 //
@@ -415,6 +422,12 @@ func (b *IPBlocker) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool
 // InsertRange inserts all IP addresses in a CIDR
 // block into the blocklist.
 //
+// If the net.IP is a valid IPv6 address and the
+// CIDR block is larger than /64, the range is
+// inserted into a separate route list. IP addresses
+// inserted in this way cannot be removed with
+// (*IPBlocker).Remove.
+//
 // If presently batching, InsertRange() will not
 // commit the changes to shared memory.
 //
@@ -425,6 +438,12 @@ func (b *IPBlocker) InsertRange(ip net.IP, ipnet *net.IPNet) error {
 
 // RemoveRange removes all IP addresses in a CIDR
 // block from the the blocklist.
+//
+// If the net.IP is a valid IPv6 address and the
+// CIDR block is larger than /64, the range is
+// removed from a separate route list. IP addresses
+// removed in this way cannot have been inserted with
+// (*IPBlocker).Insert.
 //
 // If presently batching, RemoveRange() will not
 // commit the changes to shared memory.
@@ -507,6 +526,9 @@ func (b *IPBlocker) Close() error {
 
 // Unlink removes the blocker and closes the blockers
 // shared memory.
+//
+// It is the equivalent of calling (*IPBlocker).Close
+// followed by Unlink with the same name as New.
 //
 // Taken from shm_unlink(3):
 // 	The  operation  of shm_unlink() is analogous to unlink(2): it removes a
