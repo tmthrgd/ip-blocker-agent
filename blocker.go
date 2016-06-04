@@ -74,8 +74,6 @@ func init() {
 	if csize, err := C.sysconf(C._SC_LEVEL1_DCACHE_LINESIZE); err == nil {
 		cachelineSize = uintptr(csize)
 	} else {
-		fmt.Printf("sysconf(_SC_LEVEL1_DCACHE_LINESIZE) = %s\n", err)
-
 		cachelineSize = 64
 	}
 }
