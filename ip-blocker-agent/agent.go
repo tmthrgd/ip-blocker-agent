@@ -62,7 +62,7 @@ func main() {
 		}
 
 		if err := blocker.Unlink(name); err != nil {
-			if blocker.IsNotExist(err) {
+			if os.IsNotExist(err) {
 				fmt.Println(err)
 				os.Exit(1)
 			} else {
@@ -78,7 +78,7 @@ func main() {
 
 	block, err := blocker.New(name, perms)
 	if err != nil {
-		if blocker.IsExist(err) {
+		if os.IsExist(err) {
 			fmt.Println(err)
 			os.Exit(1)
 		} else {

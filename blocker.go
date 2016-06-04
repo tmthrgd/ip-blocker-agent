@@ -92,20 +92,6 @@ func incIP(ip net.IP) {
 	}
 }
 
-// IsExist returns a boolean indicating whether the
-// error is known to report that a named shared memory
-// region already exists.
-func IsExist(err error) bool {
-	return err == unix.EEXIST
-}
-
-// IsNotExist returns a boolean indicating whether the
-// error is known to report that a named shared memory
-// region does not exist.
-func IsNotExist(err error) bool {
-	return err == unix.ENOENT
-}
-
 // Unlink removes the previously created blocker.
 //
 // Taken from shm_unlink(3):

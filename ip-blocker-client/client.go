@@ -30,7 +30,7 @@ func main() {
 
 	block, err := blocker.Open(name)
 	if err != nil {
-		if blocker.IsNotExist(err) {
+		if os.IsNotExist(err) {
 			fmt.Println(err)
 			os.Exit(1)
 		} else {
