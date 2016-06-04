@@ -284,6 +284,10 @@ func (c *Client) String() string {
 		return "<invalid state>"
 	}
 
+	if !c.checkSharedMemory() {
+		return "<invalid shared memory>"
+	}
+
 	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
 
 	return fmt.Sprintf("mapped %d bytes to %x\n"+
