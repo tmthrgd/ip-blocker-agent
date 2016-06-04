@@ -160,11 +160,13 @@ func New(name string, perms int) (*IPBlocker, error) {
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, 0, 0, 0)
 
 	if err = unix.Ftruncate(int(fd), int64(size)); err != nil {
+		unix.Close(int(fd))
 		return nil, err
 	}
 
 	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, fd, 0)
 	if err != nil {
+		unix.Close(int(fd))
 		return nil, err
 	}
 
