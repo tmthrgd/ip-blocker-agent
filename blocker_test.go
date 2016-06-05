@@ -722,6 +722,14 @@ func TestServerCount(t *testing.T) {
 	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
 		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
 	}
+
+	if server.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if _, _, _, err = server.Count(); err != ErrClosed {
+		t.Error(err)
+	}
 }
 
 func TestClientCount(t *testing.T) {
@@ -783,6 +791,27 @@ func TestClientCount(t *testing.T) {
 
 	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
 		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if client.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if _, _, _, err = client.Count(); err != ErrClosed {
+		t.Error(err)
+	}
+
+	client, err = Open(server.Name())
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer client.Close()
+
+	client.data = client.data[:headerSize-1]
+	if _, _, _, err = client.Count(); err != errInvalidSharedMem {
+		t.Error(err)
 	}
 }
 
