@@ -73,15 +73,6 @@ func (s *binarySearcher) search(check []byte) (pos int, has bool) {
 	return
 }
 
-func (s *binarySearcher) Search(check []byte) []byte {
-	pos, has := s.search(check)
-	if has {
-		return s.Data[pos*s.size : (pos+1)*s.size]
-	}
-
-	return nil
-}
-
 func (s *binarySearcher) Contains(check []byte) bool {
 	_, has := s.search(check)
 	return has
@@ -213,27 +204,6 @@ func (s *binarySearcher) RemoveRange(base []byte, num int) []byte {
 	}
 
 	return x
-}
-
-func (s *binarySearcher) Replace(b []byte) bool {
-	if pos, has := s.search(b); has {
-		copy(s.Data[pos*s.size:(pos+1)*s.size], b)
-		return true
-	}
-
-	return false
-}
-
-func (s *binarySearcher) InsertOrReplace(b []byte) {
-	pos, has := s.search(b)
-	if has {
-		copy(s.Data[pos*s.size:(pos+1)*s.size], b)
-		return
-	}
-
-	s.Data = append(s.Data, b...)
-	copy(s.Data[(pos+1)*s.size:], s.Data[pos*s.size:])
-	copy(s.Data[pos*s.size:(pos+1)*s.size], b)
 }
 
 func (s *binarySearcher) Clear() {
