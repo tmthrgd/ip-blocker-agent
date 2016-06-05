@@ -85,7 +85,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	server, err := blocker.New(name, perms)
+	server, err := blocker.New(name, os.FileMode(perms))
 	if err != nil {
 		if os.IsExist(err) {
 			fmt.Println(err)
