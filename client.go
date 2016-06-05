@@ -6,10 +6,7 @@
 package blocker
 
 /*
-#include <stdlib.h>          // For free
-#include <fcntl.h>           // For O_* constants
-#include <sys/stat.h>        // For mode constants
-#include <sys/mman.h>        // For shm_*
+#include <sys/mman.h>        // For mmap
 #include <unistd.h>          // For sysconf and _SC_* constants
 
 #include "ngx_ip_blocker_shm.h"
@@ -43,15 +40,10 @@ type Client struct {
 // Open returns a new IP blocker shared memory client
 // specified by name.
 func Open(name string) (*Client, error) {
-	nameC := C.CString(name)
-	defer C.free(unsafe.Pointer(nameC))
-
-	fd, err := C.shm_open(nameC, C.O_RDWR, 0)
+	file, err := shmOpen(name, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
-
-	file := os.NewFile(uintptr(fd), name)
 
 	stat, err := file.Stat()
 	if err != nil {

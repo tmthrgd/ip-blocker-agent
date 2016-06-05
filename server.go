@@ -6,12 +6,7 @@
 package blocker
 
 /*
-#cgo LDFLAGS: -lrt
-
-#include <stdlib.h>          // For free
-#include <fcntl.h>           // For O_* constants
-#include <sys/stat.h>        // For mode constants
-#include <sys/mman.h>        // For shm_*
+#include <sys/mman.h>        // For mmap
 #include <unistd.h>          // For sysconf and _SC_* constants
 
 #include "ngx_ip_blocker_shm.h"
@@ -77,11 +72,7 @@ func init() {
 // 	object  with  the same name will fail (unless O_CREAT was specified, in
 // 	which case a new, distinct object is created).
 func Unlink(name string) error {
-	nameC := C.CString(name)
-	defer C.free(unsafe.Pointer(nameC))
-
-	_, err := C.shm_unlink(nameC)
-	return err
+	return shmUnlink(name)
 }
 
 // Server is an IP blocker shared memory server.
@@ -108,16 +99,11 @@ type Server struct {
 //
 // This will fail if a shared memory region has already
 // been created with the same name and not unlinked.
-func New(name string, perms int) (*Server, error) {
-	nameC := C.CString(name)
-	defer C.free(unsafe.Pointer(nameC))
-
-	fd, err := C.shm_open(nameC, C.O_CREAT|C.O_EXCL|C.O_TRUNC|C.O_RDWR, C.mode_t(perms))
+func New(name string, perm os.FileMode) (*Server, error) {
+	file, err := shmOpen(name, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, perm)
 	if err != nil {
 		return nil, err
 	}
-
-	file := os.NewFile(uintptr(fd), name)
 
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, 0, 0, 0)
 
@@ -516,14 +502,14 @@ func (s *Server) Unlink() error {
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return Unlink(s.file.Name())
+		return shmUnlink(s.file.Name())
 	}
 
 	if err := s.close(); err != nil {
 		return err
 	}
 
-	return Unlink(s.file.Name())
+	return shmUnlink(s.file.Name())
 }
 
 // IsBatching returns a boolean indicating whether the
