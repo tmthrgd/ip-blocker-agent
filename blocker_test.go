@@ -314,16 +314,46 @@ func TestBatch(t *testing.T) {
 		t.Error(err)
 	}
 
+	if err = server.Batch(); err != ErrAlreadyBatching {
+		t.Error(err)
+	}
+
 	if !server.IsBatching() {
 		t.Error("not batching")
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
 	}
 
 	if err = server.Commit(); err != nil {
 		t.Error(err)
 	}
 
+	if err = server.Commit(); err != ErrNotBatching {
+		t.Error(err)
+	}
+
 	if server.IsBatching() {
 		t.Error("still batching")
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
 	}
 }
 
