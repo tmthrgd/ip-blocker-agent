@@ -1205,6 +1205,37 @@ func TestRemoveRangeNonExistAtEnd(t *testing.T) {
 	}
 }
 
+func TestAddLargeRange(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	ip, ipnet, err := net.ParseCIDR("192.0.2.0/12")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err = server.InsertRange(ip, ipnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1<<20 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1048576, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
