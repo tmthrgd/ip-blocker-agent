@@ -6,7 +6,6 @@
 package blocker
 
 /*
-#include <sys/mman.h>        // For mmap
 #include <unistd.h>          // For sysconf and _SC_* constants
 
 #include "ngx_ip_blocker_shm.h"
@@ -18,6 +17,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"syscall"
 	"unsafe"
 )
 
@@ -111,7 +111,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(file.Fd()), 0)
+	addr, err := mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 func (s *Server) commit() error {
 	s.batching = false
 
-	if _, err := C.munmap(s.addr, C.size_t(s.size)); err != nil {
+	if err := munmap(s.addr, int(s.size)); err != nil {
 		return err
 	}
 
@@ -165,7 +165,7 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(s.file.Fd()), 0)
+	addr, err := mmap(int(s.file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return err
 	}
@@ -221,11 +221,11 @@ func (s *Server) commit() error {
 
 	lock.Unlock()
 
-	if _, err = C.munmap(addr, C.size_t(size)); err != nil {
+	if err = munmap(addr, int(size)); err != nil {
 		return err
 	}
 
-	addr, err = C.mmap(nil, C.size_t(size2), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(s.file.Fd()), 0)
+	addr, err = mmap(int(s.file.Fd()), 0, int(size2), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return err
 	}
@@ -464,7 +464,7 @@ func (s *Server) Batch() error {
 func (s *Server) close() error {
 	s.closed = true
 
-	if _, err := C.munmap(s.addr, C.size_t(s.size)); err != nil {
+	if err := munmap(s.addr, int(s.size)); err != nil {
 		return err
 	}
 

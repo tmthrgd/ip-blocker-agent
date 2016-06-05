@@ -5,12 +5,7 @@
 
 package blocker
 
-/*
-#include <sys/mman.h>        // For mmap
-#include <unistd.h>          // For sysconf and _SC_* constants
-
-#include "ngx_ip_blocker_shm.h"
-*/
+//#include "ngx_ip_blocker_shm.h"
 import "C"
 
 import (
@@ -18,6 +13,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"syscall"
 	"unsafe"
 )
 
@@ -57,7 +53,7 @@ func Open(name string) (*Client, error) {
 		return nil, errInvalidSharedMem
 	}
 
-	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(file.Fd()), 0)
+	addr, err := mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		file.Close()
 		return nil, err
@@ -81,7 +77,7 @@ func Open(name string) (*Client, error) {
 	if err != nil {
 		lock.RUnlock()
 
-		C.munmap(addr, C.size_t(size))
+		munmap(addr, int(size))
 		file.Close()
 		return nil, err
 	}
@@ -100,7 +96,7 @@ func Open(name string) (*Client, error) {
 	} else if !client.checkSharedMemory() {
 		lock.RUnlock()
 
-		C.munmap(addr, C.size_t(size))
+		munmap(addr, int(size))
 		file.Close()
 		return nil, errInvalidSharedMem
 	}
@@ -139,7 +135,7 @@ func (c *Client) remap(force bool) (err error) {
 		goto err
 	}
 
-	c.addr, err = C.mmap(nil, C.size_t(stat.Size()), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(c.file.Fd()), 0)
+	c.addr, err = mmap(int(c.file.Fd()), 0, int(stat.Size()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		goto err
 	}
@@ -153,7 +149,7 @@ func (c *Client) remap(force bool) (err error) {
 
 	c.revision = uint32((*C.ngx_ip_blocker_shm_st)(c.addr).revision)
 
-	_, err = C.munmap(addr, C.size_t(size))
+	err = munmap(addr, int(size))
 	return
 
 err:
@@ -165,7 +161,7 @@ err:
 		os.Stderr.WriteString("failed to release read lock")
 	}
 
-	C.munmap(addr, C.size_t(size))
+	munmap(addr, int(size))
 	return
 }
 
@@ -272,7 +268,7 @@ func (c *Client) Close() error {
 	c.closed = true
 
 	if c.addr != nil {
-		if _, err := C.munmap(c.addr, C.size_t(c.size)); err != nil {
+		if err := munmap(c.addr, int(c.size)); err != nil {
 			return err
 		}
 
