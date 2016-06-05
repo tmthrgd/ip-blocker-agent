@@ -34,6 +34,15 @@ func (o *octalValue) String() string {
 	return fmt.Sprintf("%#o", *o)
 }
 
+func printServer(server *blocker.Server) {
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("IP4: %d, IP6: %d, IP6 routes: %d\n", ip4, ip6, ip6r)
+}
+
 func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
@@ -89,7 +98,7 @@ func main() {
 	defer server.Unlink()
 	defer server.Close()
 
-	fmt.Println(server)
+	printServer(server)
 
 	stdin := bufio.NewScanner(os.Stdin)
 
@@ -142,7 +151,7 @@ func main() {
 			}
 
 			if !server.IsBatching() {
-				fmt.Println(server)
+				printServer(server)
 			}
 		case '!':
 			if len(line) != 1 {
@@ -154,7 +163,9 @@ func main() {
 				panic(err)
 			}
 
-			fmt.Println(server)
+			if !server.IsBatching() {
+				printServer(server)
+			}
 		case 'b':
 			if len(line) != 1 && !strings.EqualFold(line, "batch") {
 				fmt.Printf("invalid input: %s\n", line)
@@ -183,7 +194,7 @@ func main() {
 				}
 			}
 
-			fmt.Println(server)
+			printServer(server)
 		case 'q':
 			fallthrough
 		case 'Q':

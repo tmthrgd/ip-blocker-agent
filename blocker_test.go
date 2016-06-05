@@ -395,6 +395,238 @@ func TestUnlink(t *testing.T) {
 	}
 }
 
+func TestServerCount(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	cidr, cidrnet, err := net.ParseCIDR("2001:db8::/64")
+	if err != nil {
+		panic(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Insert(net.ParseIP("2001:db8::")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 1 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1, 1, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.InsertRange(cidr, cidrnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 1 || ip6r != 1 {
+		t.Errorf("blocklist returned invalid count, expected (1, 1, 1), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Remove(net.ParseIP("2001:db8::")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 0 || ip6r != 1 {
+		t.Errorf("blocklist returned invalid count, expected (1, 0, 1), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.RemoveRange(cidr, cidrnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Remove(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Clear(); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Insert(net.ParseIP("2001:db8::")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 1 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 1, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 1 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1, 1, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.InsertRange(cidr, cidrnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 1 || ip6r != 1 {
+		t.Errorf("blocklist returned invalid count, expected (1, 1, 1), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Clear(); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
+func TestClientCount(t *testing.T) {
+	t.Parallel()
+
+	server, client, err := setup(true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	ip4, ip6, ip6r, err := client.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Insert(net.ParseIP("2001:db8::")); err != nil {
+		t.Error(err)
+	}
+
+	cidr, cidrnet, err := net.ParseCIDR("2001:db8::/64")
+	if err != nil {
+		panic(err)
+	}
+
+	if err = server.InsertRange(cidr, cidrnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = client.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 1 || ip6r != 1 {
+		t.Errorf("blocklist returned invalid count, expected (1, 1, 1), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+
+	if err = server.Clear(); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err = client.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", rand.Int())
 

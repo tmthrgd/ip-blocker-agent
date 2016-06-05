@@ -20,7 +20,6 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -536,24 +535,26 @@ func (s *Server) Name() string {
 	return s.file.Name()
 }
 
-// String returns a human readable representation of
-// the blocklist state.
-func (s *Server) String() string {
+// Count returns the number of IPv4 addresses, IPv6
+// address and IPv6 routes stored in the blocklist.
+//
+// It only considers those committed to shared memory.
+// It will return 'stale' results if batching.
+//
+// Will fail if Closed() has been called.
+func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return "<closed>"
+		err = ErrClosed
+		return
 	}
 
 	header := (*C.ngx_ip_blocker_shm_st)(s.addr)
 
-	return fmt.Sprintf("mapped %d bytes to %x\n"+
-		"\tIP4 of %d bytes (%d entries) mapped to %x\n"+
-		"\tIP6 of %d bytes (%d entries) mapped to %x\n"+
-		"\tIP6 routes of %d bytes (%d entries) mapped to %x",
-		s.size, s.addr,
-		header.ip4.len, s.ip4s.Len(), uintptr(s.addr)+uintptr(header.ip4.base),
-		header.ip6.len, s.ip6s.Len(), uintptr(s.addr)+uintptr(header.ip6.base),
-		header.ip6route.len, s.ip6rs.Len(), uintptr(s.addr)+uintptr(header.ip6route.base))
+	ip4 = int(header.ip4.len / net.IPv4len)
+	ip6 = int(header.ip6.len / net.IPv6len)
+	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
+	return
 }

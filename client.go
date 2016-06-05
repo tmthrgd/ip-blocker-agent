@@ -18,7 +18,6 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -281,32 +280,28 @@ func (c *Client) Name() string {
 	return c.file.Name()
 }
 
-// String returns a human readable representation of
-// the blocklist state.
-func (c *Client) String() string {
+// Count returns the number of IPv4 addresses, IPv6
+// address and IPv6 routes stored in the blocklist.
+//
+// Will fail if Closed() has been called.
+func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if c.closed {
-		return "<closed>"
+		err = ErrClosed
+		return
 	}
 
-	if c.addr == nil || c.size < int64(headerSize) {
-		return "<invalid state>"
-	}
-
-	if !c.checkSharedMemory() {
-		return "<invalid shared memory>"
+	if c.addr == nil || c.size < int64(headerSize) || !c.checkSharedMemory() {
+		err = errInvalidSharedMem
+		return
 	}
 
 	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
 
-	return fmt.Sprintf("mapped %d bytes to %x\n"+
-		"\tIP4 of %d bytes (%d entries) mapped to %x\n"+
-		"\tIP6 of %d bytes (%d entries) mapped to %x\n"+
-		"\tIP6 routes of %d bytes (%d entries) mapped to %x",
-		c.size, c.addr,
-		header.ip4.len, header.ip4.len/net.IPv4len, uintptr(c.addr)+uintptr(header.ip4.base),
-		header.ip6.len, header.ip6.len/net.IPv6len, uintptr(c.addr)+uintptr(header.ip6.base),
-		header.ip6route.len, header.ip6route.len/(net.IPv6len/2), uintptr(c.addr)+uintptr(header.ip6route.base))
+	ip4 = int(header.ip4.len / net.IPv4len)
+	ip6 = int(header.ip6.len / net.IPv6len)
+	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
+	return
 }

@@ -17,6 +17,15 @@ import (
 	blocker "github.com/tmthrgd/ip-blocker-agent"
 )
 
+func printClient(client *blocker.Client) {
+	ip4, ip6, ip6r, err := client.Count()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("IP4: %d, IP6: %d, IP6 routes: %d\n", ip4, ip6, ip6r)
+}
+
 func main() {
 	var name string
 	flag.StringVar(&name, "name", "/ngx-ip-blocker", "the shared memory name")
@@ -73,7 +82,7 @@ func main() {
 		}
 	}
 
-	fmt.Println(client)
+	printClient(client)
 
 	stdin := bufio.NewScanner(os.Stdin)
 
@@ -94,7 +103,7 @@ func main() {
 
 			fmt.Printf("invalid input: %s\n", line)
 		case '?':
-			fmt.Println(client)
+			printClient(client)
 		default:
 			ip := net.ParseIP(line)
 			if ip == nil {
