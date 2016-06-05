@@ -82,6 +82,14 @@ func testSubtraction(t *testing.T, a, b *big.Int, expect, pad int) {
 	if x := subBytes(ip1, ip2); x != expect {
 		t.Errorf("subBytes failed for %s - %s, expected %d, got %d", a, b, expect, x)
 	}
+
+	if x := subBytes32(ip1, ip2); x != expect {
+		const maxInt32 = int32(^uint32(0) >> 1)
+
+		if x != maxInt || expect <= int(maxInt32) {
+			t.Errorf("subBytes32 failed for %s - %s, expected %d, got %d", a, b, expect, x)
+		}
+	}
 }
 
 func TestSubtraction(t *testing.T) {
@@ -118,6 +126,7 @@ func TestSubtraction(t *testing.T) {
 	testSubtraction(t, big.NewInt(10000), big.NewInt(7321), 10000-7321, 4)
 	testSubtraction(t, big.NewInt(10000), big.NewInt(7321), 10000-7321, 2)
 	testSubtraction(t, big.NewInt(70), big.NewInt(30), 40, 1)
+	testSubtraction(t, bigIntZero, bigIntZero, 0, 0)
 
 	for _, size := range [...]int{16, 8, 4, 2, 1} {
 		ip1 := make([]byte, size)
@@ -132,10 +141,38 @@ func TestSubtraction(t *testing.T) {
 				t.Errorf("subBytesBigInt (%d) and subBytes (%d) differ", a, b)
 			}
 
+			c := subBytes32(ip1, ip2)
+			if a != c {
+				const maxInt32 = int32(^uint32(0) >> 1)
+
+				if c != maxInt || a <= int(maxInt32) {
+					t.Errorf("subBytesBigInt (%d) and subBytes32 (%d) differ", a, c)
+				}
+			}
+
 			rand.Read(ip2)
 			ip1, ip2 = ip2, ip1
 		}
 	}
+}
+
+func testSubtractionDifferentLengths(t *testing.T, sub func(x, y []byte) int) {
+	var x [16]byte
+	var y [20]byte
+
+	defer func() {
+		if err := recover(); err != nil && err != "different lengths" {
+			panic(err)
+		}
+	}()
+
+	sub(x[:], y[:])
+	t.Error("did not panic on different sizes")
+}
+
+func TestSubtractionDifferentLengths(t *testing.T) {
+	testSubtractionDifferentLengths(t, subBytes32)
+	testSubtractionDifferentLengths(t, subBytes64)
 }
 
 func benchmarkManualIncrement(b *testing.B, size int) {

@@ -299,6 +299,56 @@ func TestClearMixed(t *testing.T) {
 	testClear(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1", "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
+func TestClear2(t *testing.T) {
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	extraIP := make(net.IP, net.IPv6len)
+
+	for i := 0; i < 10000; i++ {
+		rand.Read(extraIP)
+
+		if err = server.Insert(extraIP[:net.IPv4len]); err != nil {
+			t.Error(err)
+		}
+
+		if err = server.Insert(extraIP); err != nil {
+			t.Error(err)
+		}
+
+		if err = server.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			t.Error(err)
+		}
+	}
+
+	// Clear with > pageSize bytes of data
+	if err = server.Clear(); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 0 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (0, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
 func TestBatch(t *testing.T) {
 	t.Parallel()
 
