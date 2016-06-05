@@ -1116,6 +1116,84 @@ func TestBinarySearcherRemoveRangeMixed(t *testing.T) {
 	testBinarySearcherRemoveRange(t, 10000, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58")
 }
 
+func TestInsertRangeWithLastAlready(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Insert(net.ParseIP("192.0.2.253")); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.255")); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.3.0")); err != nil {
+		t.Error(err)
+	}
+
+	ip, ipnet, err := net.ParseCIDR("192.0.2.0/24")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err = server.InsertRange(ip, ipnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 257 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (257, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
+func TestRemoveRangeNonExistAtEnd(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Insert(net.ParseIP("192.0.1.0")); err != nil {
+		t.Error(err)
+	}
+
+	ip, ipnet, err := net.ParseCIDR("192.0.2.0/30")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err = server.RemoveRange(ip, ipnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ip4 != 1 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("blocklist returned invalid count, expected (1, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
