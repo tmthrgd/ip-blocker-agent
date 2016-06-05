@@ -107,6 +107,10 @@ var bufPool = &sync.Pool{
 }
 
 func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
+	if len(base) != s.size {
+		panic("invalid size")
+	}
+
 	buf := bufPool.Get().(*bytes.Buffer)
 	defer bufPool.Put(buf)
 
@@ -172,6 +176,10 @@ func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
 }
 
 func (s *binarySearcher) RemoveRange(base []byte, num int) []byte {
+	if len(base) != s.size {
+		panic("invalid size")
+	}
+
 	x := append([]byte(nil), base...)
 
 	for num > 0 {

@@ -100,7 +100,7 @@ func TestBinarySearcherSize(t *testing.T) {
 		t.Error("did not panic in RemoveRange(..., 1)")
 	}
 
-	/*if !testSizePanic(func() {
+	if !testSizePanic(func() {
 		a.InsertRange(test[:], 0)
 	}) {
 		t.Error("did not panic in InsertRange(..., 0)")
@@ -110,5 +110,5 @@ func TestBinarySearcherSize(t *testing.T) {
 		a.RemoveRange(test[:], 0)
 	}) {
 		t.Error("did not panic in RemoveRange(..., 0)")
-	}*/
+	}
 }
