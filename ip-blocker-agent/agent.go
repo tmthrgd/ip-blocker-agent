@@ -76,7 +76,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	block, err := blocker.New(name, perms)
+	server, err := blocker.New(name, perms)
 	if err != nil {
 		if os.IsExist(err) {
 			fmt.Println(err)
@@ -86,10 +86,10 @@ func main() {
 		}
 	}
 
-	defer block.Unlink()
-	defer block.Close()
+	defer server.Unlink()
+	defer server.Close()
 
-	fmt.Println(block)
+	fmt.Println(server)
 
 	stdin := bufio.NewScanner(os.Stdin)
 
@@ -118,9 +118,9 @@ func main() {
 
 				switch line[0] {
 				case '+':
-					err = block.InsertRange(ip, ipnet)
+					err = server.InsertRange(ip, ipnet)
 				case '-':
-					err = block.RemoveRange(ip, ipnet)
+					err = server.RemoveRange(ip, ipnet)
 				}
 			} else {
 				ip := net.ParseIP(line[1:])
@@ -131,9 +131,9 @@ func main() {
 
 				switch line[0] {
 				case '+':
-					err = block.Insert(ip)
+					err = server.Insert(ip)
 				case '-':
-					err = block.Remove(ip)
+					err = server.Remove(ip)
 				}
 			}
 
@@ -141,8 +141,8 @@ func main() {
 				panic(err)
 			}
 
-			if !block.IsBatching() {
-				fmt.Println(block)
+			if !server.IsBatching() {
+				fmt.Println(server)
 			}
 		case '!':
 			if len(line) != 1 {
@@ -150,18 +150,18 @@ func main() {
 				continue
 			}
 
-			if err = block.Clear(); err != nil {
+			if err = server.Clear(); err != nil {
 				panic(err)
 			}
 
-			fmt.Println(block)
+			fmt.Println(server)
 		case 'b':
 			if len(line) != 1 && !strings.EqualFold(line, "batch") {
 				fmt.Printf("invalid input: %s\n", line)
 				continue
 			}
 
-			if err = block.Batch(); err != nil {
+			if err = server.Batch(); err != nil {
 				if err == blocker.ErrAlreadyBatching {
 					fmt.Println(err)
 				} else {
@@ -174,7 +174,7 @@ func main() {
 				continue
 			}
 
-			if err = block.Commit(); err != nil {
+			if err = server.Commit(); err != nil {
 				if err == blocker.ErrNotBatching {
 					fmt.Println(err)
 					continue
@@ -183,7 +183,7 @@ func main() {
 				}
 			}
 
-			fmt.Println(block)
+			fmt.Println(server)
 		case 'q':
 			fallthrough
 		case 'Q':

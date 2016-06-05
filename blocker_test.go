@@ -28,38 +28,38 @@ func init() {
 	rand = mrand.New(mrand.NewSource(seedInt))
 }
 
-func setup(withClient bool) (*IPBlocker, *Client, error) {
+func setup(withClient bool) (*Server, *Client, error) {
 	name := fmt.Sprintf("/go-test-%d", rand.Int())
 
-	blocker, err := New(name, 0600)
+	server, err := New(name, 0600)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if !withClient {
-		return blocker, nil, nil
+		return server, nil, nil
 	}
 
 	client, err := Open(name)
 	if err != nil {
-		blocker.Close()
-		blocker.Unlink()
+		server.Close()
+		server.Unlink()
 
 		return nil, nil, err
 	}
 
-	return blocker, client, nil
+	return server, client, nil
 }
 
 func testAddress(t *testing.T, addrs ...string) {
-	blocker, client, err := setup(true)
+	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 	defer client.Close()
 
 	for _, addr := range addrs {
@@ -72,7 +72,7 @@ func testAddress(t *testing.T, addrs ...string) {
 			t.Error("blocklist contains entry before any added")
 		}
 
-		if err = blocker.Insert(net.ParseIP(addr)); err != nil {
+		if err = server.Insert(net.ParseIP(addr)); err != nil {
 			t.Error(err)
 			continue
 		}
@@ -88,7 +88,7 @@ func testAddress(t *testing.T, addrs ...string) {
 			continue
 		}
 
-		if err = blocker.Remove(net.ParseIP(addr)); err != nil {
+		if err = server.Remove(net.ParseIP(addr)); err != nil {
 			t.Error(err)
 			continue
 		}
@@ -123,14 +123,14 @@ func TestMixed(t *testing.T) {
 }
 
 func testRange(t *testing.T, ipranges []string, addrs ...string) {
-	blocker, client, err := setup(true)
+	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 	defer client.Close()
 
 	for _, addr := range addrs {
@@ -150,7 +150,7 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 			t.Error(err)
 		}
 
-		if err = blocker.InsertRange(ip, ipnet); err != nil {
+		if err = server.InsertRange(ip, ipnet); err != nil {
 			t.Error(err)
 			return
 		}
@@ -175,7 +175,7 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 			t.Error(err)
 		}
 
-		if err = blocker.RemoveRange(ip, ipnet); err != nil {
+		if err = server.RemoveRange(ip, ipnet); err != nil {
 			t.Error(err)
 			return
 		}
@@ -222,14 +222,14 @@ func TestMixedRange(t *testing.T) {
 }
 
 func testClear(t *testing.T, addrs ...string) {
-	blocker, client, err := setup(true)
+	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 	defer client.Close()
 
 	for _, addr := range addrs {
@@ -242,7 +242,7 @@ func testClear(t *testing.T, addrs ...string) {
 			t.Error("blocklist contains entry before any added")
 		}
 
-		if err = blocker.Insert(net.ParseIP(addr)); err != nil {
+		if err = server.Insert(net.ParseIP(addr)); err != nil {
 			t.Error(err)
 			continue
 		}
@@ -259,7 +259,7 @@ func testClear(t *testing.T, addrs ...string) {
 		}
 	}
 
-	if err = blocker.Clear(); err != nil {
+	if err = server.Clear(); err != nil {
 		t.Error(err)
 		return
 	}
@@ -297,32 +297,32 @@ func TestClearMixed(t *testing.T) {
 func TestBatch(t *testing.T) {
 	t.Parallel()
 
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
-	if blocker.IsBatching() {
+	if server.IsBatching() {
 		t.Error("already batching")
 	}
 
-	if err = blocker.Batch(); err != nil {
+	if err = server.Batch(); err != nil {
 		t.Error(err)
 	}
 
-	if !blocker.IsBatching() {
+	if !server.IsBatching() {
 		t.Error("not batching")
 	}
 
-	if err = blocker.Commit(); err != nil {
+	if err = server.Commit(); err != nil {
 		t.Error(err)
 	}
 
-	if blocker.IsBatching() {
+	if server.IsBatching() {
 		t.Error("still batching")
 	}
 }
@@ -330,20 +330,20 @@ func TestBatch(t *testing.T) {
 func TestBlockerClose(t *testing.T) {
 	t.Parallel()
 
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
-	if err = blocker.Close(); err != nil {
+	if err = server.Close(); err != nil {
 		t.Error(err)
 	}
 
-	if err = blocker.Close(); err != ErrClosed {
+	if err = server.Close(); err != ErrClosed {
 		t.Error(err)
 	}
 }
@@ -351,14 +351,14 @@ func TestBlockerClose(t *testing.T) {
 func TestClientClose(t *testing.T) {
 	t.Parallel()
 
-	blocker, client, err := setup(true)
+	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 	defer client.Close()
 
 	if err = client.Close(); err != nil {
@@ -373,24 +373,24 @@ func TestClientClose(t *testing.T) {
 func TestUnlink(t *testing.T) {
 	t.Parallel()
 
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
-	if err = blocker.Unlink(); err != nil {
+	if err = server.Unlink(); err != nil {
 		t.Error(err)
 	}
 
-	if err = blocker.Close(); err != ErrClosed {
+	if err = server.Close(); err != ErrClosed {
 		t.Error(err)
 	}
 
-	if err = blocker.Unlink(); !os.IsNotExist(err) {
+	if err = server.Unlink(); !os.IsNotExist(err) {
 		t.Error(err)
 	}
 }
@@ -399,7 +399,7 @@ func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", rand.Int())
 
 	for i := 0; i < b.N; i++ {
-		blocker, err := New(name, 0600)
+		server, err := New(name, 0600)
 		if err != nil {
 			b.Error(err)
 			continue
@@ -407,24 +407,24 @@ func BenchmarkNew(b *testing.B) {
 
 		b.StopTimer()
 
-		blocker.Close()
-		blocker.Unlink()
+		server.Close()
+		server.Unlink()
 
 		b.StartTimer()
 	}
 }
 
 func BenchmarkOpen(b *testing.B) {
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		b.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
-	name := blocker.Name()
+	name := server.Name()
 
 	b.ResetTimer()
 
@@ -444,17 +444,17 @@ func BenchmarkOpen(b *testing.B) {
 }
 
 func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		b.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
 	if batch {
-		if err = blocker.Batch(); err != nil {
+		if err = server.Batch(); err != nil {
 			b.Error(err)
 		}
 	}
@@ -469,7 +469,7 @@ func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
 	for i := 0; i < extra; i++ {
 		mrand.Read(extraIP)
 
-		if err = blocker.Insert(extraIP); err != nil {
+		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
 		}
 	}
@@ -477,13 +477,13 @@ func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		if err = blocker.Insert(ip); err != nil {
+		if err = server.Insert(ip); err != nil {
 			b.Error(err)
 		}
 
 		b.StopTimer()
 
-		if err = blocker.Remove(ip); err != nil {
+		if err = server.Remove(ip); err != nil {
 			b.Error(err)
 		}
 
@@ -524,17 +524,17 @@ func BenchmarkInsertBatchIP6(b *testing.B) {
 }
 
 func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		b.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
 	if batch {
-		if err = blocker.Batch(); err != nil {
+		if err = server.Batch(); err != nil {
 			b.Error(err)
 		}
 	}
@@ -549,7 +549,7 @@ func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
 	for i := 0; i < extra; i++ {
 		mrand.Read(extraIP)
 
-		if err = blocker.Insert(extraIP); err != nil {
+		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
 		}
 	}
@@ -559,13 +559,13 @@ func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 
-		if err = blocker.Insert(ip); err != nil {
+		if err = server.Insert(ip); err != nil {
 			b.Error(err)
 		}
 
 		b.StartTimer()
 
-		if err = blocker.Remove(ip); err != nil {
+		if err = server.Remove(ip); err != nil {
 			b.Error(err)
 		}
 	}
@@ -604,14 +604,14 @@ func BenchmarkRemoveBatchIP6(b *testing.B) {
 }
 
 func benchmarkContains(b *testing.B, addr string, extra int) {
-	blocker, client, err := setup(true)
+	server, client, err := setup(true)
 	if err != nil {
 		b.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 	defer client.Close()
 
 	ip := net.ParseIP(addr)
@@ -619,7 +619,7 @@ func benchmarkContains(b *testing.B, addr string, extra int) {
 		panic("failed to parse " + addr)
 	}
 
-	if err = blocker.Insert(ip); err != nil {
+	if err = server.Insert(ip); err != nil {
 		b.Error(err)
 	}
 
@@ -628,7 +628,7 @@ func benchmarkContains(b *testing.B, addr string, extra int) {
 	for i := 0; i < extra; i++ {
 		mrand.Read(extraIP)
 
-		if err = blocker.Insert(extraIP); err != nil {
+		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
 		}
 	}
@@ -665,30 +665,30 @@ func BenchmarkContainsIP6(b *testing.B) {
 }
 
 func benchmarkCommit(b *testing.B, extra int) {
-	blocker, _, err := setup(false)
+	server, _, err := setup(false)
 	if err != nil {
 		b.Error(err)
 		return
 	}
 
-	defer blocker.Unlink()
-	defer blocker.Close()
+	defer server.Unlink()
+	defer server.Close()
 
 	extraIP := make(net.IP, net.IPv6len)
 
 	for i := 0; i < extra; i++ {
 		mrand.Read(extraIP)
 
-		if err = blocker.Insert(extraIP[:net.IPv4len]); err != nil {
+		if err = server.Insert(extraIP[:net.IPv4len]); err != nil {
 			b.Error(err)
 		}
 
-		if err = blocker.Insert(extraIP); err != nil {
+		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
 		}
 
-		if err = blocker.InsertRange(extraIP, &net.IPNet{
-			IP: extraIP,
+		if err = server.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
 			Mask: net.CIDRMask(64, 128),
 		}); err != nil {
 			b.Error(err)
@@ -700,14 +700,14 @@ func benchmarkCommit(b *testing.B, extra int) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 
-		if err = blocker.Batch(); err != nil {
+		if err = server.Batch(); err != nil {
 			b.Error(err)
 			continue
 		}
 
 		b.StartTimer()
 
-		if err = blocker.Commit(); err != nil {
+		if err = server.Commit(); err != nil {
 			b.Error(err)
 		}
 	}

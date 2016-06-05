@@ -48,7 +48,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	block, err := blocker.Open(name)
+	client, err := blocker.Open(name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println(err)
@@ -58,10 +58,10 @@ func main() {
 		}
 	}
 
-	defer block.Close()
+	defer client.Close()
 
 	if query != nil {
-		has, err := block.Contains(query)
+		has, err := client.Contains(query)
 		if err != nil {
 			panic(err)
 		}
@@ -73,7 +73,7 @@ func main() {
 		}
 	}
 
-	fmt.Println(block)
+	fmt.Println(client)
 
 	stdin := bufio.NewScanner(os.Stdin)
 
@@ -94,7 +94,7 @@ func main() {
 
 			fmt.Printf("invalid input: %s\n", line)
 		case '?':
-			fmt.Println(block)
+			fmt.Println(client)
 		default:
 			ip := net.ParseIP(line)
 			if ip == nil {
@@ -102,7 +102,7 @@ func main() {
 				continue
 			}
 
-			has, err := block.Contains(ip)
+			has, err := client.Contains(ip)
 			if err != nil {
 				panic(err)
 			}
