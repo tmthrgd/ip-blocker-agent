@@ -193,7 +193,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 	}
 
 	if c.addr == nil || c.size < int64(headerSize) {
-		return false, errors.New("invalid state")
+		return false, errInvalidSharedMem
 	}
 
 	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
