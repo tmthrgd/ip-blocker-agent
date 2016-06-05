@@ -34,7 +34,7 @@ func shmOpen(name string, flag int, perm os.FileMode) (*os.File, error) {
 		o |= syscall.S_ISVTX
 	}
 
-	fd, err := syscall.Open(devShm + name, flag|syscall.O_CLOEXEC, o)
+	fd, err := syscall.Open(devShm+name, flag|syscall.O_CLOEXEC, o)
 	if err != nil {
 		return nil, err
 	}
