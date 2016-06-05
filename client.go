@@ -56,16 +56,19 @@ func Open(name string) (*Client, error) {
 
 	stat, err := file.Stat()
 	if err != nil {
+		file.Close()
 		return nil, err
 	}
 
 	size := stat.Size()
 	if size < int64(headerSize) {
+		file.Close()
 		return nil, errInvalidSharedMem
 	}
 
 	addr, err := C.mmap(nil, C.size_t(size), C.PROT_READ|C.PROT_WRITE, C.MAP_SHARED, C.int(file.Fd()), 0)
 	if err != nil {
+		file.Close()
 		return nil, err
 	}
 
@@ -88,6 +91,7 @@ func Open(name string) (*Client, error) {
 		lock.RUnlock()
 
 		C.munmap(addr, C.size_t(size))
+		file.Close()
 		return nil, err
 	}
 
@@ -96,6 +100,7 @@ func Open(name string) (*Client, error) {
 
 		/* RUnlock is called inside of remap iff an err is returned */
 		if err := client.remap(); err != nil {
+			file.Close()
 			return nil, err
 		}
 
@@ -105,6 +110,7 @@ func Open(name string) (*Client, error) {
 		lock.RUnlock()
 
 		C.munmap(addr, C.size_t(size))
+		file.Close()
 		return nil, errInvalidSharedMem
 	}
 
