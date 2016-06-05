@@ -1000,7 +1000,7 @@ func BenchmarkClientRemap(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		if err = client.remap(); err != nil {
+		if err = client.remap(true); err != nil {
 			b.Error(err)
 		}
 	}

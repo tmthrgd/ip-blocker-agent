@@ -98,7 +98,7 @@ func Open(name string) (*Client, error) {
 		/* shm has changed since we mmaped it (unlikely but possible) */
 
 		/* RUnlock is called inside of remap iff an err is returned */
-		if err := client.remap(); err != nil {
+		if err := client.remap(true); err != nil {
 			file.Close()
 			return nil, err
 		}
@@ -118,9 +118,25 @@ func Open(name string) (*Client, error) {
 }
 
 /* RLock must be held before calling remap */
-func (c *Client) remap() (err error) {
+func (c *Client) remap(force bool) (err error) {
 	if c.closed {
 		panic(ErrClosed)
+	}
+
+	if !force {
+		c.mu.RUnlock()
+		c.mu.Lock()
+		defer c.mu.RLock()
+		defer c.mu.Unlock()
+
+		if c.closed {
+			return ErrClosed
+		}
+
+		header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+		if c.revision == uint32(header.revision) {
+			return nil
+		}
 	}
 
 	addr, size := c.addr, c.size
@@ -202,7 +218,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 
 	if c.revision != uint32(header.revision) {
 		/* RUnlock is called inside of remap iff an error is returned */
-		if err := c.remap(); err != nil {
+		if err := c.remap(false); err != nil {
 			return false, err
 		}
 
