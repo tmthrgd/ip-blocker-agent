@@ -952,3 +952,31 @@ func BenchmarkCommitEmpty(b *testing.B) {
 func BenchmarkCommit(b *testing.B) {
 	benchmarkCommit(b, 10000/3)
 }
+
+func BenchmarkClientRemap(b *testing.B) {
+	server, client, err := setup(true)
+	if err != nil {
+		b.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	lock := client.rwlockerForTest()
+	lock.RLock()
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if err = client.remap(); err != nil {
+			b.Error(err)
+		}
+	}
+
+	b.StopTimer()
+
+	lock = client.rwlockerForTest()
+	lock.RUnlock()
+}

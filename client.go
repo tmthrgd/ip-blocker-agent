@@ -305,3 +305,19 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
 	return
 }
+
+func (c *Client) rwlockerForTest() *rwLock {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.closed {
+		panic(ErrClosed)
+	}
+
+	if c.addr == nil || c.size < int64(headerSize) {
+		panic(errInvalidSharedMem)
+	}
+
+	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+	return (*rwLock)(&header.lock)
+}
