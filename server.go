@@ -329,7 +329,7 @@ func (s *Server) Remove(ip net.IP) error {
 	return s.doInsertRemove(ip, false)
 }
 
-var useSearcherRange = true // for testing
+var doInsertRemoveRangeHook func(insert bool, ip net.IP, ipnet *net.IPNet, ips *binarySearcher) // for testing
 
 func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) error {
 	s.mu.Lock()
@@ -361,7 +361,9 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
-	if useSearcherRange {
+	if doInsertRemoveRangeHook != nil {
+		doInsertRemoveRangeHook(insert, ip, ipnet, ips)
+	} else {
 		base := ip[:ips.Size()]
 		ones, _ := ipnet.Mask.Size()
 		left := len(base)*8 - ones
@@ -380,18 +382,6 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 				base = ips.InsertRange(base, num)
 			} else {
 				base = ips.RemoveRange(base, num)
-			}
-		}
-	} else {
-		size := ips.Size()
-
-		if insert {
-			for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
-				ips.Insert(ip[:size])
-			}
-		} else {
-			for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
-				ips.Remove(ip[:size])
 			}
 		}
 	}

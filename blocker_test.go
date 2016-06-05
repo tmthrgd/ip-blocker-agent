@@ -56,6 +56,20 @@ func setup(withClient bool) (*Server, *Client, error) {
 	return server, client, nil
 }
 
+func insertRemoveRangeSlowHook(insert bool, ip net.IP, ipnet *net.IPNet, ips *binarySearcher) {
+	size := ips.Size()
+
+	if insert {
+		for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
+			ips.Insert(ip[:size])
+		}
+	} else {
+		for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
+			ips.Remove(ip[:size])
+		}
+	}
+}
+
 func testAddress(t *testing.T, addrs ...string) {
 	server, client, err := setup(true)
 	if err != nil {
@@ -778,11 +792,10 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 		t.Error(err)
 	}
 
-	old := useSearcherRange
 	defer func() {
-		useSearcherRange = old
+		doInsertRemoveRangeHook = nil
 	}()
-	useSearcherRange = false
+	doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 
 	extraIP := make(net.IP, net.IPv6len)
 
@@ -852,27 +865,27 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 			}
 		}
 
-		useSearcherRange = false
+		doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 		if err = server1.InsertRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
 
-		useSearcherRange = true
+		doInsertRemoveRangeHook = nil
 		if err = server2.InsertRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
 	}
 
 	if !bytes.Equal(server1.ip4s.Data, server2.ip4s.Data) {
-		t.Errorf("useSearcherRange = true and = false produced different ip4 data, with extra = %d", extra)
+		t.Errorf("doInsertRemoveRangeHook = nil and = insertRemoveRangeSlowHook produced different ip4 data, with extra = %d", extra)
 	}
 
 	if !bytes.Equal(server1.ip6s.Data, server2.ip6s.Data) {
-		t.Errorf("useSearcherRange = true and = false produced different ip6 data, with extra = %d", extra)
+		t.Errorf("doInsertRemoveRangeHook = nil and = insertRemoveRangeSlowHook produced different ip6 data, with extra = %d", extra)
 	}
 
 	if !bytes.Equal(server1.ip6rs.Data, server2.ip6rs.Data) {
-		t.Errorf("useSearcherRange = true and = false produced different ip6 route data, with extra = %d", extra)
+		t.Errorf("doInsertRemoveRangeHook = nil and = insertRemoveRangeSlowHook produced different ip6 route data, with extra = %d", extra)
 	}
 }
 
@@ -959,12 +972,6 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 		t.Error(err)
 	}
 
-	old := useSearcherRange
-	defer func() {
-		useSearcherRange = old
-	}()
-	useSearcherRange = true
-
 	extraIP := make(net.IP, net.IPv6len)
 
 	for i := 0; i < extra; i++ {
@@ -1030,33 +1037,37 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 		}
 	}
 
+	defer func() {
+		doInsertRemoveRangeHook = nil
+	}()
+
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
 			t.Error(err)
 		}
 
-		useSearcherRange = false
+		doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 		if err = server1.RemoveRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
 
-		useSearcherRange = true
+		doInsertRemoveRangeHook = nil
 		if err = server2.RemoveRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
 	}
 
 	if !bytes.Equal(server1.ip4s.Data, server2.ip4s.Data) {
-		t.Errorf("useSearcherRange = true and = false produced different ip4 data, with extra = %d", extra)
+		t.Errorf("doInsertRemoveRangeHook = nil and = insertRemoveRangeSlowHook produced different ip4 data, with extra = %d", extra)
 	}
 
 	if !bytes.Equal(server1.ip6s.Data, server2.ip6s.Data) {
-		t.Errorf("useSearcherRange = true and = false produced different ip6 data, with extra = %d", extra)
+		t.Errorf("doInsertRemoveRangeHook = nil and = insertRemoveRangeSlowHook produced different ip6 data, with extra = %d", extra)
 	}
 
 	if !bytes.Equal(server1.ip6rs.Data, server2.ip6rs.Data) {
-		t.Errorf("useSearcherRange = true and = false produced different ip6 route data, with extra = %d", extra)
+		t.Errorf("doInsertRemoveRangeHook = nil and = insertRemoveRangeSlowHook produced different ip6 route data, with extra = %d", extra)
 	}
 }
 
@@ -1548,7 +1559,7 @@ func BenchmarkClientRemap(b *testing.B) {
 	lock.RUnlock()
 }
 
-func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int, searcherRange bool) {
+func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int) {
 	server, _, err := setup(false)
 	if err != nil {
 		b.Error(err)
@@ -1588,23 +1599,16 @@ func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra
 		}
 	}
 
-	old := useSearcherRange
-	defer func() {
-		useSearcherRange = old
-	}()
-
 	b.ResetTimer()
 
 	if insert {
 		for i := 0; i < b.N; i++ {
-			useSearcherRange = searcherRange
 			if err = server.InsertRange(ip, ipnet); err != nil {
 				b.Error(err)
 			}
 
 			b.StopTimer()
 
-			useSearcherRange = true
 			if err = server.RemoveRange(ip, ipnet); err != nil {
 				b.Error(err)
 			}
@@ -1615,14 +1619,12 @@ func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()
 
-			useSearcherRange = true
 			if err = server.InsertRange(ip, ipnet); err != nil {
 				b.Error(err)
 			}
 
 			b.StartTimer()
 
-			useSearcherRange = searcherRange
 			if err = server.RemoveRange(ip, ipnet); err != nil {
 				b.Error(err)
 			}
@@ -1630,98 +1632,50 @@ func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra
 	}
 }
 
-func BenchmarkInsertRangeIP4NoSearchSlow24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 0, false)
+func BenchmarkInsertRangeIP4NoSearch24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 0)
 }
 
-func BenchmarkInsertRangeIP4NoSearchFast24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 0, true)
+func BenchmarkInsertRangeIP6NoSearch116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 0)
 }
 
-func BenchmarkInsertRangeIP6NoSearchSlow116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 0, false)
+func BenchmarkInsertRangeIP6RouteNoSearch54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 0)
 }
 
-func BenchmarkInsertRangeIP6NoSearchFast116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 0, true)
+func BenchmarkInsertRangeIP424(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 10000)
 }
 
-func BenchmarkInsertRangeIP6RouteNoSearchSlow54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 0, false)
+func BenchmarkInsertRangeIP6116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 10000)
 }
 
-func BenchmarkInsertRangeIP6RouteNoSearchFast54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 0, true)
+func BenchmarkInsertRangeIP6Route54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 10000)
 }
 
-func BenchmarkInsertRangeIP4Slow24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 10000, false)
+func BenchmarkRemoveRangeIP4NoSearch24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 0)
 }
 
-func BenchmarkInsertRangeIP4Fast24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 10000, true)
+func BenchmarkRemoveRangeIP6NoSearch116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 0)
 }
 
-func BenchmarkInsertRangeIP6Slow116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 10000, false)
+func BenchmarkRemoveRangeIP6RouteNoSearch54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 0)
 }
 
-func BenchmarkInsertRangeIP6Fast116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 10000, true)
+func BenchmarkRemoveRangeIP424(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 10000)
 }
 
-func BenchmarkInsertRangeIP6RouteSlow54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 10000, false)
+func BenchmarkRemoveRangeIP6116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 10000)
 }
 
-func BenchmarkInsertRangeIP6RouteFast54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 10000, true)
-}
-
-func BenchmarkRemoveRangeIP4NoSearchSlow24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 0, false)
-}
-
-func BenchmarkRemoveRangeIP4NoSearchFast24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 0, true)
-}
-
-func BenchmarkRemoveRangeIP6NoSearchSlow116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 0, false)
-}
-
-func BenchmarkRemoveRangeIP6NoSearchFast116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 0, true)
-}
-
-func BenchmarkRemoveRangeIP6RouteNoSearchSlow54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 0, false)
-}
-
-func BenchmarkRemoveRangeIP6RouteNoSearchFast54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 0, true)
-}
-
-func BenchmarkRemoveRangeIP4Slow24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 10000, false)
-}
-
-func BenchmarkRemoveRangeIP4Fast24(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 10000, true)
-}
-
-func BenchmarkRemoveRangeIP6Slow116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 10000, false)
-}
-
-func BenchmarkRemoveRangeIP6Fast116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 10000, true)
-}
-
-func BenchmarkRemoveRangeIP6RouteSlow54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 10000, false)
-}
-
-func BenchmarkRemoveRangeIP6RouteFast54(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 10000, true)
+func BenchmarkRemoveRangeIP6Route54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 10000)
 }
