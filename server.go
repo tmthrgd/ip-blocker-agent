@@ -534,3 +534,11 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
 	return
 }
+
+func (s *Server) rwlockerForTest() *rwLock {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&s.data[0]))
+	return (*rwLock)(&header.lock)
+}

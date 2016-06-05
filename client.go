@@ -311,14 +311,6 @@ func (c *Client) rwlockerForTest() *rwLock {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if c.closed {
-		panic(ErrClosed)
-	}
-
-	if len(c.data) < int(headerSize) {
-		panic(errInvalidSharedMem)
-	}
-
 	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 	return (*rwLock)(&header.lock)
 }

@@ -1236,6 +1236,37 @@ func TestAddLargeRange(t *testing.T) {
 	}
 }
 
+func TestServerRWLocker(t *testing.T) {
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	lock := server.rwlockerForTest()
+	lock.Lock()
+	lock.Unlock()
+}
+
+func TestClientRWLocker(t *testing.T) {
+	server, client, err := setup(true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	lock := client.rwlockerForTest()
+	lock.RLock()
+	lock.RUnlock()
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
@@ -1581,6 +1612,7 @@ func BenchmarkClientRemap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		if err = client.remap(true); err != nil {
 			b.Error(err)
+			return
 		}
 	}
 
