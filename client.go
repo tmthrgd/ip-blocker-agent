@@ -293,7 +293,7 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	if c.addr == nil || c.size < int64(headerSize) || !c.checkSharedMemory() {
+	if c.addr == nil || c.size < int64(headerSize) {
 		err = errInvalidSharedMem
 		return
 	}
