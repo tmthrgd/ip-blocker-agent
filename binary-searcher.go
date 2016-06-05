@@ -30,8 +30,6 @@ func newBinarySearcher(size int, compare func(a, b []byte) int) *binarySearcher 
 		size: size,
 
 		compare: compare,
-
-		buffer: make([]byte, size),
 	}
 }
 
@@ -44,6 +42,10 @@ func (s *binarySearcher) Less(i, j int) bool {
 }
 
 func (s *binarySearcher) Swap(i, j int) {
+	if s.buffer == nil {
+		s.buffer = make([]byte, s.size)
+	}
+
 	copy(s.buffer, s.Data[i*s.size:(i+1)*s.size])
 	copy(s.Data[i*s.size:(i+1)*s.size], s.Data[j*s.size:(j+1)*s.size])
 	copy(s.Data[j*s.size:(j+1)*s.size], s.buffer)
@@ -107,6 +109,10 @@ var bufPool = &sync.Pool{
 }
 
 func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
+	return s.insertRange(append([]byte(nil), base...), num)
+}
+
+func (s *binarySearcher) insertRange(base []byte, num int) []byte {
 	if len(base) != s.size {
 		panic("invalid size")
 	}
@@ -114,7 +120,7 @@ func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
 	buf := bufPool.Get().(*bytes.Buffer)
 	defer bufPool.Put(buf)
 
-	x := append([]byte(nil), base...)
+	x := base
 
 	for num > 0 {
 		pos, has := s.search(x)
@@ -176,11 +182,15 @@ func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
 }
 
 func (s *binarySearcher) RemoveRange(base []byte, num int) []byte {
+	return s.removeRange(append([]byte(nil), base...), num)
+}
+
+func (s *binarySearcher) removeRange(base []byte, num int) []byte {
 	if len(base) != s.size {
 		panic("invalid size")
 	}
 
-	x := append([]byte(nil), base...)
+	x := base
 
 	for num > 0 {
 		pos, has := s.search(x)
