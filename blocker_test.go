@@ -362,7 +362,7 @@ func TestBatch(t *testing.T) {
 	}
 }
 
-func TestBlockerClose(t *testing.T) {
+func TestServerClose(t *testing.T) {
 	t.Parallel()
 
 	server, _, err := setup(false)

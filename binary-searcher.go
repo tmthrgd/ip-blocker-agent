@@ -158,7 +158,7 @@ func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
 		num -= toInsert
 
 		buf.Reset()
-		buf.Grow(toInsert*s.size)
+		buf.Grow(toInsert * s.size)
 		buf.Write(x)
 
 		for i := 1; i < toInsert; i++ {
