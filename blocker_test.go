@@ -492,6 +492,27 @@ func TestUnlink(t *testing.T) {
 	if err = server.Unlink(); !os.IsNotExist(err) {
 		t.Error(err)
 	}
+
+	server, _, err = setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = Unlink(server.Name()); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Unlink(); !os.IsNotExist(err) {
+		t.Error(err)
+	}
+
+	if err = Unlink(server.Name()); !os.IsNotExist(err) {
+		t.Error(err)
+	}
 }
 
 func TestServerName(t *testing.T) {
