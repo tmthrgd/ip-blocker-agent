@@ -67,16 +67,6 @@ func init() {
 	}
 }
 
-func incIP(ip net.IP) {
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-
-		if ip[j] > 0 {
-			break
-		}
-	}
-}
-
 // Unlink removes the previously created blocker.
 //
 // Taken from shm_unlink(3):
@@ -339,6 +329,8 @@ func (s *Server) Remove(ip net.IP) error {
 	return s.doInsertRemove(ip, false)
 }
 
+var useSearcherRange = true // for testing
+
 func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -369,15 +361,38 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
-	size := ips.Size()
+	if useSearcherRange {
+		base := ip[:ips.Size()]
+		ones, _ := ipnet.Mask.Size()
+		left := len(base)*8 - ones
 
-	if insert {
-		for ; ipnet.Contains(ip); incIP(ip[:size]) {
-			ips.Insert(ip[:size])
+		for left >= 0 {
+			var num int
+			if left > 32 {
+				num = 1 << 32
+				left -= 32
+			} else {
+				num = 1 << uint(left)
+				left = -1
+			}
+
+			if insert {
+				base = ips.InsertRange(base, num)
+			} else {
+				base = ips.RemoveRange(base, num)
+			}
 		}
 	} else {
-		for ; ipnet.Contains(ip); incIP(ip[:size]) {
-			ips.Remove(ip[:size])
+		size := ips.Size()
+
+		if insert {
+			for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
+				ips.Insert(ip[:size])
+			}
+		} else {
+			for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
+				ips.Remove(ip[:size])
+			}
 		}
 	}
 

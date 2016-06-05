@@ -5,17 +5,21 @@
 
 package blocker
 
+// Note: you can cleanup any stray shared memory with:
+// 	find /dev/shm/ -name "go-test-*" -exec unlink {} \;
+
 import (
+	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
-	mrand "math/rand"
+	"math/rand"
 	"net"
 	"os"
 	"testing"
 )
 
-var rand *mrand.Rand
+var nameRand *rand.Rand
 
 func init() {
 	var seed [8]byte
@@ -25,11 +29,11 @@ func init() {
 	}
 
 	seedInt := int64(binary.LittleEndian.Uint64(seed[:]))
-	rand = mrand.New(mrand.NewSource(seedInt))
+	nameRand = rand.New(rand.NewSource(seedInt))
 }
 
 func setup(withClient bool) (*Server, *Client, error) {
-	name := fmt.Sprintf("/go-test-%d", rand.Int())
+	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
 	server, err := New(name, 0600)
 	if err != nil {
@@ -164,7 +168,7 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 		}
 
 		if !has {
-			t.Error("blocklist does not contain entry after insert")
+			t.Errorf("blocklist does not contain entry after insert: %v, %s", ipranges, addr)
 			continue
 		}
 	}
@@ -218,7 +222,7 @@ func TestIP6RouteRange(t *testing.T) {
 func TestMixedRange(t *testing.T) {
 	t.Parallel()
 
-	testRange(t, []string{"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "2001:db8::/112", "::/64", "1::/58"}, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.128", "203.0.113.0", "203.0.113.255", "2001:db8::", "2001:db8::1", "2001:db8::f", "::", "::1", "::f", "::dead:beef", "1::", "1::1", "1::f", "1::dead:beef")
+	testRange(t, []string{"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58"}, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.128", "203.0.113.0", "203.0.113.255", "2001:db8::", "2001:db8::1", "2001:db8::f", "::", "::1", "::f", "::dead:beef", "1::", "1::1", "1::f", "1::dead:beef")
 }
 
 func testClear(t *testing.T, addrs ...string) {
@@ -657,8 +661,373 @@ func TestClientCount(t *testing.T) {
 	}
 }
 
+func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) {
+	server1, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server1.Unlink()
+	defer server1.Close()
+
+	server2, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server2.Unlink()
+	defer server2.Close()
+
+	if err = server1.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server2.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	old := useSearcherRange
+	defer func() {
+		useSearcherRange = old
+	}()
+	useSearcherRange = false
+
+	extraIP := make(net.IP, net.IPv6len)
+
+	for i := 0; i < extra; i++ {
+		rand.Read(extraIP)
+
+		if err = server1.Insert(extraIP[:net.IPv4len]); err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.Insert(extraIP); err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.Insert(extraIP[:net.IPv4len]); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.Insert(extraIP); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			t.Error(err)
+		}
+	}
+
+	for _, iprange := range ipranges {
+		ip, ipnet, err := net.ParseCIDR(iprange)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if rand.Intn(2) == 0 {
+			if err = server1.Insert(ip); err != nil {
+				t.Error(err)
+			}
+
+			if err = server2.Insert(ip); err != nil {
+				t.Error(err)
+			}
+
+			for j := 0; j < rand.Intn(4); j++ {
+				incrBytes(ip)
+			}
+
+			for j := 0; j < rand.Intn(6); j++ {
+				incrBytes(ip)
+
+				if err = server1.Insert(ip); err != nil {
+					t.Error(err)
+				}
+
+				if err = server2.Insert(ip); err != nil {
+					t.Error(err)
+				}
+			}
+		}
+
+		useSearcherRange = false
+		if err = server1.InsertRange(ip, ipnet); err != nil {
+			t.Error(err)
+		}
+
+		useSearcherRange = true
+		if err = server2.InsertRange(ip, ipnet); err != nil {
+			t.Error(err)
+		}
+	}
+
+	if !bytes.Equal(server1.ip4s.Data, server2.ip4s.Data) {
+		t.Errorf("useSearcherRange = true and = false produced different ip4 data, with extra = %d", extra)
+	}
+
+	if !bytes.Equal(server1.ip6s.Data, server2.ip6s.Data) {
+		t.Errorf("useSearcherRange = true and = false produced different ip6 data, with extra = %d", extra)
+	}
+
+	if !bytes.Equal(server1.ip6rs.Data, server2.ip6rs.Data) {
+		t.Errorf("useSearcherRange = true and = false produced different ip6 route data, with extra = %d", extra)
+	}
+}
+
+func TestBinarySearcherInsertRangeIP4NoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 0, "192.0.2.0/24")
+	testBinarySearcherInsertRange(t, 0, "198.51.100.0/24")
+	testBinarySearcherInsertRange(t, 0, "203.0.113.0/24")
+	testBinarySearcherInsertRange(t, 0, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")
+}
+
+func TestBinarySearcherInsertRangeIP6NoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 0, "2001:db8::/112")
+}
+
+func TestBinarySearcherInsertRangeIP6RouteNoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 0, "2001:db8::/64")
+	testBinarySearcherInsertRange(t, 0, "2001:db8::/58")
+}
+
+func TestBinarySearcherInsertRangeMixedNoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 0, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58")
+}
+
+func TestBinarySearcherInsertRangeIP4(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 10000, "192.0.2.0/24")
+	testBinarySearcherInsertRange(t, 10000, "198.51.100.0/24")
+	testBinarySearcherInsertRange(t, 10000, "203.0.113.0/24")
+	testBinarySearcherInsertRange(t, 10000, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")
+}
+
+func TestBinarySearcherInsertRangeIP6(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 10000, "2001:db8::/112")
+}
+
+func TestBinarySearcherInsertRangeIP6Route(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 10000, "2001:db8::/64")
+	testBinarySearcherInsertRange(t, 10000, "2001:db8::/58")
+}
+
+func TestBinarySearcherInsertRangeMixed(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherInsertRange(t, 10000, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58")
+}
+
+func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) {
+	server1, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server1.Unlink()
+	defer server1.Close()
+
+	server2, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server2.Unlink()
+	defer server2.Close()
+
+	if err = server1.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server2.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	old := useSearcherRange
+	defer func() {
+		useSearcherRange = old
+	}()
+	useSearcherRange = true
+
+	extraIP := make(net.IP, net.IPv6len)
+
+	for i := 0; i < extra; i++ {
+		rand.Read(extraIP)
+
+		if err = server1.Insert(extraIP[:net.IPv4len]); err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.Insert(extraIP); err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.Insert(extraIP[:net.IPv4len]); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.Insert(extraIP); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			t.Error(err)
+		}
+	}
+
+	for _, iprange := range ipranges {
+		ip, ipnet, err := net.ParseCIDR(iprange)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.InsertRange(ip, ipnet); err != nil {
+			t.Error(err)
+		}
+
+		if err = server2.InsertRange(ip, ipnet); err != nil {
+			t.Error(err)
+		}
+
+		if rand.Intn(2) == 0 {
+			for j := 0; j < 1+rand.Intn(5); j++ {
+				incrBytes(ip)
+			}
+
+			if err = server1.Remove(ip); err != nil {
+				t.Error(err)
+			}
+
+			if err = server2.Remove(ip); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+
+	for _, iprange := range ipranges {
+		ip, ipnet, err := net.ParseCIDR(iprange)
+		if err != nil {
+			t.Error(err)
+		}
+
+		useSearcherRange = false
+		if err = server1.RemoveRange(ip, ipnet); err != nil {
+			t.Error(err)
+		}
+
+		useSearcherRange = true
+		if err = server2.RemoveRange(ip, ipnet); err != nil {
+			t.Error(err)
+		}
+	}
+
+	if !bytes.Equal(server1.ip4s.Data, server2.ip4s.Data) {
+		t.Errorf("useSearcherRange = true and = false produced different ip4 data, with extra = %d", extra)
+	}
+
+	if !bytes.Equal(server1.ip6s.Data, server2.ip6s.Data) {
+		t.Errorf("useSearcherRange = true and = false produced different ip6 data, with extra = %d", extra)
+	}
+
+	if !bytes.Equal(server1.ip6rs.Data, server2.ip6rs.Data) {
+		t.Errorf("useSearcherRange = true and = false produced different ip6 route data, with extra = %d", extra)
+	}
+}
+
+func TestBinarySearcherRemoveRangeIP4NoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 0, "192.0.2.0/24")
+	testBinarySearcherRemoveRange(t, 0, "198.51.100.0/24")
+	testBinarySearcherRemoveRange(t, 0, "203.0.113.0/24")
+	testBinarySearcherRemoveRange(t, 0, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")
+}
+
+func TestBinarySearcherRemoveRangeIP6NoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 0, "2001:db8::/112")
+}
+
+func TestBinarySearcherRemoveRangeIP6RouteNoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 0, "2001:db8::/64")
+	testBinarySearcherRemoveRange(t, 0, "2001:db8::/58")
+}
+
+func TestBinarySearcherRemoveRangeMixedNoSearch(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 0, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58")
+}
+
+func TestBinarySearcherRemoveRangeIP4(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 10000, "192.0.2.0/24")
+	testBinarySearcherRemoveRange(t, 10000, "198.51.100.0/24")
+	testBinarySearcherRemoveRange(t, 10000, "203.0.113.0/24")
+	testBinarySearcherRemoveRange(t, 10000, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")
+}
+
+func TestBinarySearcherRemoveRangeIP6(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 10000, "2001:db8::/112")
+}
+
+func TestBinarySearcherRemoveRangeIP6Route(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 10000, "2001:db8::/64")
+	testBinarySearcherRemoveRange(t, 10000, "2001:db8::/58")
+}
+
+func TestBinarySearcherRemoveRangeMixed(t *testing.T) {
+	t.Parallel()
+
+	testBinarySearcherRemoveRange(t, 10000, "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58")
+}
+
 func BenchmarkNew(b *testing.B) {
-	name := fmt.Sprintf("/go-test-%d", rand.Int())
+	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
 	for i := 0; i < b.N; i++ {
 		server, err := New(name, 0600)
@@ -729,7 +1098,7 @@ func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
 	extraIP := make(net.IP, len(ip))
 
 	for i := 0; i < extra; i++ {
-		mrand.Read(extraIP)
+		rand.Read(extraIP)
 
 		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
@@ -809,7 +1178,7 @@ func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
 	extraIP := make(net.IP, len(ip))
 
 	for i := 0; i < extra; i++ {
-		mrand.Read(extraIP)
+		rand.Read(extraIP)
 
 		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
@@ -888,7 +1257,7 @@ func benchmarkContains(b *testing.B, addr string, extra int) {
 	extraIP := make(net.IP, len(ip))
 
 	for i := 0; i < extra; i++ {
-		mrand.Read(extraIP)
+		rand.Read(extraIP)
 
 		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
@@ -939,7 +1308,7 @@ func benchmarkCommit(b *testing.B, extra int) {
 	extraIP := make(net.IP, net.IPv6len)
 
 	for i := 0; i < extra; i++ {
-		mrand.Read(extraIP)
+		rand.Read(extraIP)
 
 		if err = server.Insert(extraIP[:net.IPv4len]); err != nil {
 			b.Error(err)
@@ -1009,4 +1378,182 @@ func BenchmarkClientRemap(b *testing.B) {
 
 	lock = client.rwlockerForTest()
 	lock.RUnlock()
+}
+
+func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int, searcherRange bool) {
+	server, _, err := setup(false)
+	if err != nil {
+		b.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		b.Error(err)
+	}
+
+	ip, ipnet, err := net.ParseCIDR(iprange)
+	if err != nil {
+		panic(err)
+	}
+
+	extraIP := make(net.IP, len(ip))
+
+	for i := 0; i < extra; i++ {
+		rand.Read(extraIP)
+
+		if err = server.Insert(extraIP[:net.IPv4len]); err != nil {
+			b.Error(err)
+		}
+
+		if err = server.Insert(extraIP); err != nil {
+			b.Error(err)
+		}
+
+		if err = server.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			b.Error(err)
+		}
+	}
+
+	old := useSearcherRange
+	defer func() {
+		useSearcherRange = old
+	}()
+
+	b.ResetTimer()
+
+	if insert {
+		for i := 0; i < b.N; i++ {
+			useSearcherRange = searcherRange
+			if err = server.InsertRange(ip, ipnet); err != nil {
+				b.Error(err)
+			}
+
+			b.StopTimer()
+
+			useSearcherRange = true
+			if err = server.RemoveRange(ip, ipnet); err != nil {
+				b.Error(err)
+			}
+
+			b.StartTimer()
+		}
+	} else {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+
+			useSearcherRange = true
+			if err = server.InsertRange(ip, ipnet); err != nil {
+				b.Error(err)
+			}
+
+			b.StartTimer()
+
+			useSearcherRange = searcherRange
+			if err = server.RemoveRange(ip, ipnet); err != nil {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func BenchmarkInsertRangeIP4NoSearchSlow24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 0, false)
+}
+
+func BenchmarkInsertRangeIP4NoSearchFast24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 0, true)
+}
+
+func BenchmarkInsertRangeIP6NoSearchSlow116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 0, false)
+}
+
+func BenchmarkInsertRangeIP6NoSearchFast116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 0, true)
+}
+
+func BenchmarkInsertRangeIP6RouteNoSearchSlow54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 0, false)
+}
+
+func BenchmarkInsertRangeIP6RouteNoSearchFast54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 0, true)
+}
+
+func BenchmarkInsertRangeIP4Slow24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 10000, false)
+}
+
+func BenchmarkInsertRangeIP4Fast24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/24", 10000, true)
+}
+
+func BenchmarkInsertRangeIP6Slow116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 10000, false)
+}
+
+func BenchmarkInsertRangeIP6Fast116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 10000, true)
+}
+
+func BenchmarkInsertRangeIP6RouteSlow54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 10000, false)
+}
+
+func BenchmarkInsertRangeIP6RouteFast54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/54", 10000, true)
+}
+
+func BenchmarkRemoveRangeIP4NoSearchSlow24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 0, false)
+}
+
+func BenchmarkRemoveRangeIP4NoSearchFast24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 0, true)
+}
+
+func BenchmarkRemoveRangeIP6NoSearchSlow116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 0, false)
+}
+
+func BenchmarkRemoveRangeIP6NoSearchFast116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 0, true)
+}
+
+func BenchmarkRemoveRangeIP6RouteNoSearchSlow54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 0, false)
+}
+
+func BenchmarkRemoveRangeIP6RouteNoSearchFast54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 0, true)
+}
+
+func BenchmarkRemoveRangeIP4Slow24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 10000, false)
+}
+
+func BenchmarkRemoveRangeIP4Fast24(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/24", 10000, true)
+}
+
+func BenchmarkRemoveRangeIP6Slow116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 10000, false)
+}
+
+func BenchmarkRemoveRangeIP6Fast116(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 10000, true)
+}
+
+func BenchmarkRemoveRangeIP6RouteSlow54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 10000, false)
+}
+
+func BenchmarkRemoveRangeIP6RouteFast54(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/54", 10000, true)
 }

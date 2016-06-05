@@ -8,6 +8,7 @@ package blocker
 import (
 	"bytes"
 	"sort"
+	"sync"
 )
 
 type binarySearcher struct {
@@ -98,6 +99,122 @@ func (s *binarySearcher) Insert(b []byte) bool {
 	return true
 }
 
+func (s *binarySearcher) Remove(b []byte) bool {
+	pos, has := s.search(b)
+	if has {
+		s.Data = append(s.Data[:pos*s.size], s.Data[(pos+1)*s.size:]...)
+		return true
+	}
+
+	return false
+}
+
+var bufPool = &sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
+	buf := bufPool.Get().(*bytes.Buffer)
+	defer bufPool.Put(buf)
+
+	x := append([]byte(nil), base...)
+
+	for num > 0 {
+		pos, has := s.search(x)
+		if has {
+			for {
+				incrBytes(x)
+
+				num--
+				pos++
+
+				if num <= 0 || pos*s.size >= len(s.Data) || s.compare(x, s.Data[pos*s.size:(pos+1)*s.size]) != 0 {
+					break
+				}
+			}
+
+			if num <= 0 {
+				break
+			}
+		}
+
+		var toInsert int
+
+		if pos*s.size == len(s.Data) {
+			toInsert = num
+		} else {
+			toInsert = subBytes(s.Data[pos*s.size:(pos+1)*s.size], x)
+			if toInsert > num {
+				toInsert = num
+			}
+		}
+
+		if toInsert > 1<<16 {
+			toInsert = 1 << 16
+		}
+
+		num -= toInsert
+
+		buf.Reset()
+		buf.Grow(toInsert*s.size)
+		buf.Write(x)
+
+		for i := 1; i < toInsert; i++ {
+			incrBytes(x)
+			buf.Write(x)
+		}
+
+		b := buf.Bytes()
+
+		s.Data = append(s.Data, b...)
+		copy(s.Data[(pos+toInsert)*s.size:], s.Data[pos*s.size:])
+		copy(s.Data[pos*s.size:(pos+toInsert)*s.size], b)
+
+		if num != 0 {
+			incrBytes(x)
+		}
+	}
+
+	return x
+}
+
+func (s *binarySearcher) RemoveRange(base []byte, num int) []byte {
+	x := append([]byte(nil), base...)
+
+	for num > 0 {
+		pos, has := s.search(x)
+		if !has {
+			if pos*s.size == len(s.Data) {
+				break
+			}
+
+			by := subBytes(s.Data[pos*s.size:(pos+1)*s.size], x)
+			num -= by
+
+			for ; by > 0; by-- {
+				incrBytes(x)
+			}
+
+			continue
+		}
+
+		startPos := pos
+
+		for num > 0 && pos*s.size < len(s.Data) && s.compare(x, s.Data[pos*s.size:(pos+1)*s.size]) == 0 {
+			incrBytes(x)
+
+			num--
+			pos++
+		}
+
+		s.Data = append(s.Data[:startPos*s.size], s.Data[pos*s.size:]...)
+	}
+
+	return x
+}
+
 func (s *binarySearcher) Replace(b []byte) bool {
 	if pos, has := s.search(b); has {
 		copy(s.Data[pos*s.size:(pos+1)*s.size], b)
@@ -117,16 +234,6 @@ func (s *binarySearcher) InsertOrReplace(b []byte) {
 	s.Data = append(s.Data, b...)
 	copy(s.Data[(pos+1)*s.size:], s.Data[pos*s.size:])
 	copy(s.Data[pos*s.size:(pos+1)*s.size], b)
-}
-
-func (s *binarySearcher) Remove(b []byte) bool {
-	pos, has := s.search(b)
-	if has {
-		s.Data = append(s.Data[:pos*s.size], s.Data[(pos+1)*s.size:]...)
-		return true
-	}
-
-	return false
 }
 
 func (s *binarySearcher) Clear() {
