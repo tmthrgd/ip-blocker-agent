@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -426,6 +427,45 @@ func TestUnlink(t *testing.T) {
 
 	if err = server.Unlink(); !os.IsNotExist(err) {
 		t.Error(err)
+	}
+}
+
+func TestServerName(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if !strings.HasPrefix(server.Name(), "/go-test-") {
+		t.Errorf("invalid name, expected of the form /go-test-%%d, got: %s", server.Name())
+	}
+}
+
+func TestClientName(t *testing.T) {
+	t.Parallel()
+
+	server, client, err := setup(true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	if !strings.HasPrefix(client.Name(), "/go-test-") {
+		t.Errorf("invalid name, expected of the form /go-test-%%d, got: %s", client.Name())
+	}
+
+	if server.Name() != client.Name() {
+		t.Errorf("client and server name do not match: %q != %q", server.Name(), client.Name())
 	}
 }
 
