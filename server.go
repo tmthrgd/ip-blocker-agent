@@ -34,29 +34,29 @@ var (
 )
 
 var (
-	cachelineSize uintptr
-	pageSize      uintptr
+	cachelineSize int
+	pageSize      int
 )
 
 /* ngx_align, taken from ngx_config.h */
-func align(d, a uintptr) uintptr {
+func align(d, a int) int {
 	return (d + (a - 1)) &^ (a - 1)
 }
 
-func calculateOffsets(base uintptr, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size uintptr) {
+func calculateOffsets(base, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size int) {
 	ip4BasePos = align(base, cachelineSize)
-	ip6BasePos = align(ip4BasePos+uintptr(ip4Len), cachelineSize)
-	ip6rBasePos = align(ip6BasePos+uintptr(ip6Len), cachelineSize)
-	end = align(ip6rBasePos+uintptr(ip6rLen), cachelineSize)
+	ip6BasePos = align(ip4BasePos+ip4Len, cachelineSize)
+	ip6rBasePos = align(ip6BasePos+ip6Len, cachelineSize)
+	end = align(ip6rBasePos+ip6rLen, cachelineSize)
 	size = align(end, pageSize)
 	return
 }
 
 func init() {
-	pageSize = uintptr(os.Getpagesize())
+	pageSize = os.Getpagesize()
 
 	if csize, err := C.sysconf(C._SC_LEVEL1_DCACHE_LINESIZE); err == nil {
-		cachelineSize = uintptr(csize)
+		cachelineSize = int(csize)
 	} else {
 		cachelineSize = 64
 	}
@@ -83,10 +83,8 @@ type Server struct {
 	ip6s  *binarySearcher
 	ip6rs *binarySearcher
 
-	addr unsafe.Pointer
-
-	end  uintptr
-	size uintptr
+	data []byte
+	end  int
 
 	mu sync.Mutex
 
@@ -105,18 +103,18 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(headerSize, 0, 0, 0)
+	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(int(headerSize), 0, 0, 0)
 
 	if err = file.Truncate(int64(size)); err != nil {
 		return nil, err
 	}
 
-	addr, err := mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return nil, err
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
 	lock := (*rwLock)(&header.lock)
 
 	lock.Create()
@@ -138,21 +136,19 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		ip6s:  newBinarySearcher(net.IPv6len, nil),
 		ip6rs: newBinarySearcher(net.IPv6len/2, nil),
 
-		addr: addr,
-
+		data: data,
 		end:  end,
-		size: size,
 	}, nil
 }
 
 func (s *Server) commit() error {
 	s.batching = false
 
-	if err := munmap(s.addr, int(s.size)); err != nil {
+	if err := syscall.Munmap(s.data); err != nil {
 		return err
 	}
 
-	ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(headerSize, len(s.ip4s.Data), len(s.ip6s.Data), len(s.ip6rs.Data))
+	ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(int(headerSize), len(s.ip4s.Data), len(s.ip6s.Data), len(s.ip6rs.Data))
 
 	end := s.end
 	if end2 > end {
@@ -165,22 +161,17 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	addr, err := mmap(int(s.file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err := syscall.Mmap(int(s.file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return err
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
 	lock := (*rwLock)(&header.lock)
 
-	ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos))
-	copy(ip4Base[:len(s.ip4s.Data):ip6BasePos-ip4BasePos], s.ip4s.Data)
-
-	ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos))
-	copy(ip6Base[:len(s.ip6s.Data):ip6rBasePos-ip6BasePos], s.ip6s.Data)
-
-	ip6rBase := (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos))
-	copy(ip6rBase[:len(s.ip6rs.Data):size-ip6rBasePos], s.ip6rs.Data)
+	copy(data[ip4BasePos:ip4BasePos+len(s.ip4s.Data):ip6BasePos], s.ip4s.Data)
+	copy(data[ip6BasePos:ip6BasePos+len(s.ip6s.Data):ip6rBasePos], s.ip6s.Data)
+	copy(data[ip6rBasePos:ip6rBasePos+len(s.ip6rs.Data):size], s.ip6rs.Data)
 
 	lock.Lock()
 
@@ -197,14 +188,9 @@ func (s *Server) commit() error {
 
 	lock.Unlock()
 
-	ip4Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip4BasePos2))
-	copy(ip4Base[:len(s.ip4s.Data):ip6BasePos2-ip4BasePos2], s.ip4s.Data)
-
-	ip6Base = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6BasePos2))
-	copy(ip6Base[:len(s.ip6s.Data):ip6rBasePos2-ip6BasePos2], s.ip6s.Data)
-
-	ip6rBase = (*[1 << 30]byte)(unsafe.Pointer(uintptr(addr) + ip6rBasePos2))
-	copy(ip6rBase[:len(s.ip6rs.Data):size2-ip6rBasePos2], s.ip6rs.Data)
+	copy(data[ip4BasePos2:ip4BasePos2+len(s.ip4s.Data):ip6BasePos2], s.ip4s.Data)
+	copy(data[ip6BasePos2:ip6BasePos2+len(s.ip6s.Data):ip6rBasePos2], s.ip6s.Data)
+	copy(data[ip6rBasePos2:ip6rBasePos2+len(s.ip6rs.Data):size2], s.ip6rs.Data)
 
 	lock.Lock()
 
@@ -221,18 +207,17 @@ func (s *Server) commit() error {
 
 	lock.Unlock()
 
-	if err = munmap(addr, int(size)); err != nil {
+	if err := syscall.Munmap(data); err != nil {
 		return err
 	}
 
-	addr, err = mmap(int(s.file.Fd()), 0, int(size2), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err = syscall.Mmap(int(s.file.Fd()), 0, int(size2), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return err
 	}
 
-	s.addr = addr
+	s.data = data
 	s.end = end2
-	s.size = size2
 	return nil
 }
 
@@ -464,7 +449,7 @@ func (s *Server) Batch() error {
 func (s *Server) close() error {
 	s.closed = true
 
-	if err := munmap(s.addr, int(s.size)); err != nil {
+	if err := syscall.Munmap(s.data); err != nil {
 		return err
 	}
 
@@ -542,7 +527,7 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(s.addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&s.data[0]))
 
 	ip4 = int(header.ip4.len / net.IPv4len)
 	ip6 = int(header.ip6.len / net.IPv6len)

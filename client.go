@@ -23,8 +23,7 @@ var errInvalidSharedMem = errors.New("invalid shared memory")
 type Client struct {
 	file *os.File
 
-	addr unsafe.Pointer
-	size int64
+	data []byte
 
 	mu sync.RWMutex
 
@@ -53,20 +52,19 @@ func Open(name string) (*Client, error) {
 		return nil, errInvalidSharedMem
 	}
 
-	addr, err := mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		file.Close()
 		return nil, err
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
 	lock := (*rwLock)(&header.lock)
 
 	client := &Client{
 		file: file,
 
-		addr: addr,
-		size: size,
+		data: data,
 	}
 
 	lock.RLock()
@@ -77,7 +75,7 @@ func Open(name string) (*Client, error) {
 	if err != nil {
 		lock.RUnlock()
 
-		munmap(addr, int(size))
+		syscall.Munmap(data)
 		file.Close()
 		return nil, err
 	}
@@ -91,12 +89,12 @@ func Open(name string) (*Client, error) {
 			return nil, err
 		}
 
-		header = (*C.ngx_ip_blocker_shm_st)(client.addr)
+		header = (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&client.data[0]))
 		lock = (*rwLock)(&header.lock)
 	} else if !client.checkSharedMemory() {
 		lock.RUnlock()
 
-		munmap(addr, int(size))
+		syscall.Munmap(data)
 		file.Close()
 		return nil, errInvalidSharedMem
 	}
@@ -121,47 +119,45 @@ func (c *Client) remap(force bool) (err error) {
 			return ErrClosed
 		}
 
-		header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+		header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 		if c.revision == uint32(header.revision) {
 			return nil
 		}
 	}
 
-	addr, size := c.addr, c.size
-	c.addr, c.size = nil, 0
+	data := c.data
+	c.data = nil
 
 	stat, err := c.file.Stat()
 	if err != nil {
 		goto err
 	}
 
-	c.addr, err = mmap(int(c.file.Fd()), 0, int(stat.Size()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	c.data, err = syscall.Mmap(int(c.file.Fd()), 0, int(stat.Size()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		goto err
 	}
-
-	c.size = stat.Size()
 
 	if !c.checkSharedMemory() {
 		err = errInvalidSharedMem
 		goto err
 	}
 
-	c.revision = uint32((*C.ngx_ip_blocker_shm_st)(c.addr).revision)
+	c.revision = uint32((*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0])).revision)
 
-	err = munmap(addr, int(size))
+	err = syscall.Munmap(data)
 	return
 
 err:
-	if c.size == 0 || c.size >= int64(headerSize) {
-		header := (*C.ngx_ip_blocker_shm_st)(addr)
+	if len(c.data) == 0 || len(c.data) >= int(headerSize) {
+		header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
 		lock := (*rwLock)(&header.lock)
 		lock.RUnlock()
 	} else {
 		os.Stderr.WriteString("failed to release read lock")
 	}
 
-	munmap(addr, int(size))
+	syscall.Munmap(data)
 	return
 }
 
@@ -170,16 +166,21 @@ func (c *Client) checkSharedMemory() bool {
 		panic(ErrClosed)
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 
-	return c.size >= int64(headerSize) &&
-		c.size >= int64(headerSize)+int64(header.ip4.len+header.ip6.len+header.ip6route.len) &&
+	const maxInt = int(^uint(0) >> 1)
+	return len(c.data) >= int(headerSize) &&
+		uintptr(headerSize)+uintptr(header.ip4.len+header.ip6.len+header.ip6route.len) <= uintptr(maxInt) &&
+		len(c.data) >= int(headerSize)+int(header.ip4.len+header.ip6.len+header.ip6route.len) &&
 		(header.ip4.len == 0 || uintptr(header.ip4.base) >= headerSize) &&
 		(header.ip6.len == 0 || uintptr(header.ip6.base) >= headerSize) &&
 		(header.ip6route.len == 0 || uintptr(header.ip6route.base) >= headerSize) &&
-		int64(uintptr(header.ip4.base)+uintptr(header.ip4.len)) <= c.size &&
-		int64(uintptr(header.ip6.base)+uintptr(header.ip6.len)) <= c.size &&
-		int64(uintptr(header.ip6route.base)+uintptr(header.ip6route.len)) <= c.size &&
+		uintptr(header.ip4.base)+uintptr(header.ip4.len) <= uintptr(maxInt) &&
+		uintptr(header.ip6.base)+uintptr(header.ip6.len) <= uintptr(maxInt) &&
+		uintptr(header.ip6route.base)+uintptr(header.ip6route.len) <= uintptr(maxInt) &&
+		int(uintptr(header.ip4.base)+uintptr(header.ip4.len)) <= len(c.data) &&
+		int(uintptr(header.ip6.base)+uintptr(header.ip6.len)) <= len(c.data) &&
+		int(uintptr(header.ip6route.base)+uintptr(header.ip6route.len)) <= len(c.data) &&
 		header.ip4.len%4 == 0 &&
 		header.ip6.len%16 == 0 &&
 		header.ip6route.len%8 == 0
@@ -195,11 +196,11 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		return false, ErrClosed
 	}
 
-	if c.addr == nil || c.size < int64(headerSize) {
+	if len(c.data) < int(headerSize) {
 		return false, errInvalidSharedMem
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 	lock := (*rwLock)(&header.lock)
 
 	lock.RLock()
@@ -210,7 +211,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 			return false, err
 		}
 
-		header = (*C.ngx_ip_blocker_shm_st)(c.addr)
+		header = (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 		lock = (*rwLock)(&header.lock)
 	}
 
@@ -224,8 +225,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		searcher := newBinarySearcher(net.IPv4len, nil)
-		ip4Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(c.addr) + uintptr(header.ip4.base)))
-		searcher.Data = ip4Base[:header.ip4.len:header.ip4.len]
+		searcher.Data = c.data[header.ip4.base : int(header.ip4.base)+int(header.ip4.len)]
 
 		return searcher.Contains(ip), nil
 	} else if ip6 := ip.To16(); ip6 != nil {
@@ -233,8 +233,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 
 		if header.ip6route.len != 0 {
 			searcher := newBinarySearcher(net.IPv6len/2, nil)
-			ip6rBase := (*[1 << 30]byte)(unsafe.Pointer(uintptr(c.addr) + uintptr(header.ip6route.base)))
-			searcher.Data = ip6rBase[:header.ip6route.len:header.ip6route.len]
+			searcher.Data = c.data[header.ip6route.base : int(header.ip6route.base)+int(header.ip6route.len)]
 
 			if searcher.Contains(ip[:net.IPv6len/2]) {
 				return true, nil
@@ -246,8 +245,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		searcher := newBinarySearcher(net.IPv6len, nil)
-		ip6Base := (*[1 << 30]byte)(unsafe.Pointer(uintptr(c.addr) + uintptr(header.ip6.base)))
-		searcher.Data = ip6Base[:header.ip6.len:header.ip6.len]
+		searcher.Data = c.data[header.ip6.base : int(header.ip6.base)+int(header.ip6.len)]
 
 		return searcher.Contains(ip), nil
 	} else {
@@ -267,13 +265,12 @@ func (c *Client) Close() error {
 
 	c.closed = true
 
-	if c.addr != nil {
-		if err := munmap(c.addr, int(c.size)); err != nil {
+	if c.data != nil {
+		if err := syscall.Munmap(c.data); err != nil {
 			return err
 		}
 
-		c.addr = nil
-		c.size = 0
+		c.data = nil
 	}
 
 	return c.file.Close()
@@ -297,12 +294,12 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	if c.addr == nil || c.size < int64(headerSize) {
+	if len(c.data) < int(headerSize) {
 		err = errInvalidSharedMem
 		return
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 
 	ip4 = int(header.ip4.len / net.IPv4len)
 	ip6 = int(header.ip6.len / net.IPv6len)
@@ -318,10 +315,10 @@ func (c *Client) rwlockerForTest() *rwLock {
 		panic(ErrClosed)
 	}
 
-	if c.addr == nil || c.size < int64(headerSize) {
+	if len(c.data) < int(headerSize) {
 		panic(errInvalidSharedMem)
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(c.addr)
+	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
 	return (*rwLock)(&header.lock)
 }
