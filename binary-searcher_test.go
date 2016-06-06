@@ -127,7 +127,7 @@ func TestBinarySearcherInsert(t *testing.T) {
 		t.Errorf("invalid length, expected 1000, got %d", a.Len())
 	}
 
-	for i := 0; i < a.Len() - 1; i++ {
+	for i := 0; i < a.Len()-1; i++ {
 		diff := subBytes(a.Data[(i+1)*4:(i+2)*4], a.Data[i*4:(i+1)*4])
 		if diff != 2 {
 			t.Errorf("invalid sort, difference should be 2, got %d", diff)
@@ -147,7 +147,7 @@ func TestBinarySearcherInsert(t *testing.T) {
 		t.Errorf("invalid length, expected 2000, got %d", a.Len())
 	}
 
-	for i := 0; i < a.Len() - 1; i++ {
+	for i := 0; i < a.Len()-1; i++ {
 		diff := subBytes(a.Data[(i+1)*4:(i+2)*4], a.Data[i*4:(i+1)*4])
 		if diff != 1 {
 			t.Errorf("invalid sort, difference should be 1, got %d", diff)
