@@ -18,8 +18,7 @@ import (
 )
 
 // ErrClosed will be returned on attempts to call
-// methods on a closed server or client has been
-// called.
+// methods on a closed server or client.
 var ErrClosed = errors.New("shared memory closed")
 
 const headerSize = unsafe.Sizeof(C.ngx_ip_blocker_shm_st{})
