@@ -112,3 +112,181 @@ func TestBinarySearcherSize(t *testing.T) {
 		t.Error("did not panic in RemoveRange(..., 0)")
 	}
 }
+
+func TestBinarySearcherInsert(t *testing.T) {
+	a := newBinarySearcher(4, nil)
+
+	var x [4]byte
+	for i := 0; i < 1000; i++ {
+		incrBytes(x[:])
+		incrBytes(x[:])
+		a.Insert(x[:])
+	}
+
+	if a.Len() != 1000 {
+		t.Errorf("invalid length, expected 1000, got %d", a.Len())
+	}
+
+	for i := 0; i < a.Len() - 1; i++ {
+		diff := subBytes(a.Data[(i+1)*4:(i+2)*4], a.Data[i*4:(i+1)*4])
+		if diff != 2 {
+			t.Errorf("invalid sort, difference should be 2, got %d", diff)
+			t.Errorf("\ta: %x, b: %x", a.Data[i*4:(i+1)*4], a.Data[(i+1)*4:(i+2)*4])
+		}
+	}
+
+	var y [4]byte
+	incrBytes(y[:])
+
+	for i := 0; i < 2000; i++ {
+		incrBytes(y[:])
+		a.Insert(y[:])
+	}
+
+	if a.Len() != 2000 {
+		t.Errorf("invalid length, expected 2000, got %d", a.Len())
+	}
+
+	for i := 0; i < a.Len() - 1; i++ {
+		diff := subBytes(a.Data[(i+1)*4:(i+2)*4], a.Data[i*4:(i+1)*4])
+		if diff != 1 {
+			t.Errorf("invalid sort, difference should be 1, got %d", diff)
+			t.Errorf("\ta: %x, b: %x", a.Data[i*4:(i+1)*4], a.Data[(i+1)*4:(i+2)*4])
+		}
+	}
+}
+
+func TestBinarySearcherInsertRange(t *testing.T) {
+	a := newBinarySearcher(4, nil)
+
+	var x [4]byte
+	for i := 0; i < 79; i++ {
+		incrBytes(x[:])
+	}
+
+	a.InsertRange(x[:], 1747)
+
+	if a.Len() != 1747 {
+		t.Errorf("invalid length, expected 1747, got %d", a.Len())
+	}
+
+	for i := 0; i < 1747; i++ {
+		if !a.Contains(x[:]) {
+			t.Errorf("does not contain %x", x)
+		}
+
+		if pos := a.Index(x[:]); pos != i {
+			t.Errorf("InsertRange inserted at wrong position, expected %d, got %d", i, pos)
+		}
+
+		incrBytes(x[:])
+	}
+}
+
+func TestBinarySearcherRemoveRange(t *testing.T) {
+	a := newBinarySearcher(4, nil)
+
+	var x [4]byte
+	for i := 0; i < 157; i++ {
+		incrBytes(x[:])
+	}
+
+	a.InsertRange(x[:], 893)
+
+	if a.Len() != 893 {
+		t.Errorf("invalid length, expected 893, got %d", a.Len())
+	}
+
+	for i := 0; i < 17; i++ {
+		incrBytes(x[:])
+	}
+
+	a.RemoveRange(x[:], 731)
+
+	if a.Len() != 162 {
+		t.Errorf("invalid length, expected 162, got %d", a.Len())
+	}
+
+	var y [4]byte
+	for i := 0; i < 157; i++ {
+		incrBytes(y[:])
+	}
+
+	for i := 0; i < 17; i++ {
+		if !a.Contains(y[:]) {
+			t.Errorf("does not contain %x", y)
+		}
+
+		if pos := a.Index(y[:]); pos != i {
+			t.Errorf("wrong position, expected %d, got %d", i, pos)
+		}
+
+		incrBytes(y[:])
+	}
+
+	for i := 0; i < 731; i++ {
+		if a.Contains(y[:]) {
+			t.Errorf("contains removed %x", y)
+		}
+
+		incrBytes(y[:])
+	}
+
+	for i := 0; i < 145; i++ {
+		if !a.Contains(y[:]) {
+			t.Errorf("does not contain %x", y)
+		}
+
+		if pos := a.Index(y[:]); pos != 17+i {
+			t.Errorf("wrong position, expected %d, got %d", 17+i, pos)
+		}
+
+		incrBytes(y[:])
+	}
+}
+
+func TestBinarySearcherRemove(t *testing.T) {
+	a := newBinarySearcher(4, nil)
+
+	var x [4]byte
+	for i := 0; i < 21; i++ {
+		incrBytes(x[:])
+	}
+
+	a.InsertRange(x[:], 1342)
+
+	if a.Len() != 1342 {
+		t.Errorf("invalid length, expected 1342, got %d", a.Len())
+	}
+
+	for i := 0; i < 1342; i += 2 {
+		incrBytes(x[:])
+		a.Remove(x[:])
+		incrBytes(x[:])
+	}
+
+	var y [4]byte
+	for i := 0; i < 21; i++ {
+		incrBytes(y[:])
+	}
+
+	for i, j := 0, 0; i < 1342; i++ {
+		if i%2 == 0 {
+			if !a.Contains(y[:]) {
+				t.Errorf("does not contain %x", y)
+			}
+
+			if pos := a.Index(y[:]); pos != j {
+				t.Errorf("wrong position, expected %d, got %d", j, pos)
+			}
+
+			j++
+		} else {
+			if a.Contains(y[:]) {
+				t.Errorf("contains %x", y)
+			}
+		}
+
+		incrBytes(y[:])
+	}
+}
