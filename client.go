@@ -56,7 +56,10 @@ func Open(name string) (*Client, error) {
 	}
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
-	lock := header.rwLocker()
+	if header.version != 1 {
+		file.Close()
+		return nil, errInvalidSharedMem
+	}
 
 	client := &Client{
 		file: file,
@@ -64,6 +67,7 @@ func Open(name string) (*Client, error) {
 		data: data,
 	}
 
+	lock := header.rwLocker()
 	lock.RLock()
 
 	client.revision = uint32(header.revision)

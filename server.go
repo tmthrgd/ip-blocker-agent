@@ -5,7 +5,6 @@
 
 package blocker
 
-//#include <unistd.h>          // For ssize_t
 import "C"
 
 import (
@@ -100,15 +99,16 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	}
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
-	lock := header.rwLocker()
+	header.version = 1
 
+	lock := header.rwLocker()
 	lock.Create()
 
 	lock.Lock()
 
-	header.ip4.base = C.ssize_t(ip4BasePos)
-	header.ip6.base = C.ssize_t(ip6BasePos)
-	header.ip6route.base = C.ssize_t(ip6rBasePos)
+	header.ip4.base = C.size_t(ip4BasePos)
+	header.ip6.base = C.size_t(ip6BasePos)
+	header.ip6route.base = C.size_t(ip6rBasePos)
 
 	header.revision = 1
 
@@ -160,13 +160,13 @@ func (s *Server) commit() error {
 
 	lock.Lock()
 
-	header.ip4.base = C.ssize_t(ip4BasePos)
+	header.ip4.base = C.size_t(ip4BasePos)
 	header.ip4.len = C.size_t(len(s.ip4s.Data))
 
-	header.ip6.base = C.ssize_t(ip6BasePos)
+	header.ip6.base = C.size_t(ip6BasePos)
 	header.ip6.len = C.size_t(len(s.ip6s.Data))
 
-	header.ip6route.base = C.ssize_t(ip6rBasePos)
+	header.ip6route.base = C.size_t(ip6rBasePos)
 	header.ip6route.len = C.size_t(len(s.ip6rs.Data))
 
 	header.revision++
@@ -179,9 +179,9 @@ func (s *Server) commit() error {
 
 	lock.Lock()
 
-	header.ip4.base = C.ssize_t(ip4BasePos2)
-	header.ip6.base = C.ssize_t(ip6BasePos2)
-	header.ip6route.base = C.ssize_t(ip6rBasePos2)
+	header.ip4.base = C.size_t(ip4BasePos2)
+	header.ip6.base = C.size_t(ip6BasePos2)
+	header.ip6route.base = C.size_t(ip6rBasePos2)
 
 	header.revision++
 
