@@ -25,5 +25,5 @@ var (
 	// ErrInvalidSharedMem will be returned in most Client
 	// functions if the backing shared memory is invalid at
 	// the time of the call.
-	ErrInvalidSharedMem = errors.New("invalid shared memory")
+	ErrInvalidSharedMemory = errors.New("invalid shared memory")
 )
