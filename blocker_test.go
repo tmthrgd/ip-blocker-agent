@@ -802,16 +802,25 @@ func TestClientCount(t *testing.T) {
 	if _, _, _, err = client.Count(); err != ErrClosed {
 		t.Error(err)
 	}
+}
 
-	client, err = Open(server.Name())
+func TestClientCorrupted(t *testing.T) {
+	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
+	server.Close()
+	server.Unlink()
 	defer client.Close()
 
 	client.data = client.data[:headerSize-1]
+
+	if _, err = client.Contains(net.IPv4zero); err != errInvalidSharedMem {
+		t.Error(err)
+	}
+
 	if _, _, _, err = client.Count(); err != errInvalidSharedMem {
 		t.Error(err)
 	}
