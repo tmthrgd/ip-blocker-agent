@@ -5,29 +5,30 @@
 
 package blocker
 
-/*
-#include <semaphore.h>       // For sem_*
-
-#include "ngx_ip_blocker_shm.h"
-*/
+//#include "ngx_ip_blocker_shm.h"
 import "C"
+
+import "github.com/tmthrgd/go-sem"
 
 type mutex C.ngx_ip_blocker_mutex_st
 
 func (m *mutex) Create() {
-	if _, err := C.sem_init(&m.sem, 1, 1); err != nil {
+	sem := (*sem.Semaphore)(&m.sem)
+	if err := sem.Init(1); err != nil {
 		panic(err)
 	}
 }
 
 func (m *mutex) Lock() {
-	if _, err := C.sem_wait(&m.sem); err != nil {
+	sem := (*sem.Semaphore)(&m.sem)
+	if err := sem.Wait(); err != nil {
 		panic(err)
 	}
 }
 
 func (m *mutex) Unlock() {
-	if _, err := C.sem_post(&m.sem); err != nil {
+	sem := (*sem.Semaphore)(&m.sem)
+	if err := sem.Post(); err != nil {
 		panic(err)
 	}
 }

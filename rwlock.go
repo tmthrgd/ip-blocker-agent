@@ -4,14 +4,14 @@
 
 package blocker
 
-/*
-#include <semaphore.h>       // For sem_*
-
-#include "ngx_ip_blocker_shm.h"
-*/
+//#include "ngx_ip_blocker_shm.h"
 import "C"
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+
+	"github.com/tmthrgd/go-sem"
+)
 
 // A rwLock is a reader/writer mutual exclusion lock.
 // The lock can be held by an arbitrary number of readers
@@ -24,11 +24,13 @@ func (rw *rwLock) Create() {
 	w := (*mutex)(&rw.w)
 	w.Create()
 
-	if _, err := C.sem_init(&rw.writer_sem, 1, 0); err != nil {
+	writerSem := (*sem.Semaphore)(&rw.writer_sem)
+	if err := writerSem.Init(0); err != nil {
 		panic(err)
 	}
 
-	if _, err := C.sem_init(&rw.reader_sem, 1, 0); err != nil {
+	readerSem := (*sem.Semaphore)(&rw.reader_sem)
+	if err := readerSem.Init(0); err != nil {
 		panic(err)
 	}
 
@@ -52,7 +54,8 @@ func (rw *rwLock) Lock() {
 
 	// Wait for active readers.
 	if r != 0 && atomic.AddInt32((*int32)(&rw.reader_wait), r) != 0 {
-		if _, err := C.sem_wait(&rw.writer_sem); err != nil {
+		writerSem := (*sem.Semaphore)(&rw.writer_sem)
+		if err := writerSem.Wait(); err != nil {
 			panic(err)
 		}
 	}
@@ -72,8 +75,9 @@ func (rw *rwLock) Unlock() {
 	}
 
 	// Unblock blocked readers, if any.
+	readerSem := (*sem.Semaphore)(&rw.reader_sem)
 	for i := 0; i < int(r); i++ {
-		if _, err := C.sem_post(&rw.reader_sem); err != nil {
+		if err := readerSem.Post(); err != nil {
 			panic(err)
 		}
 	}
@@ -87,7 +91,8 @@ func (rw *rwLock) Unlock() {
 func (rw *rwLock) RLock() {
 	if atomic.AddInt32((*int32)(&rw.reader_count), 1) < 0 {
 		// A writer is pending, wait for it.
-		if _, err := C.sem_wait(&rw.reader_sem); err != nil {
+		readerSem := (*sem.Semaphore)(&rw.reader_sem)
+		if err := readerSem.Wait(); err != nil {
 			panic(err)
 		}
 	}
@@ -106,7 +111,8 @@ func (rw *rwLock) RUnlock() {
 		// A writer is pending.
 		if atomic.AddInt32((*int32)(&rw.reader_wait), -1) == 0 {
 			// The last reader unblocks the writer.
-			if _, err := C.sem_post(&rw.writer_sem); err != nil {
+			writerSem := (*sem.Semaphore)(&rw.writer_sem)
+			if err := writerSem.Post(); err != nil {
 				panic(err)
 			}
 		}
