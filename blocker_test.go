@@ -1377,6 +1377,8 @@ func testPanic(fn func()) (didPanic bool) {
 }
 
 func TestClosedPanics(t *testing.T) {
+	t.Parallel()
+
 	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
@@ -1401,6 +1403,8 @@ func TestClosedPanics(t *testing.T) {
 }
 
 func TestClosedErrors(t *testing.T) {
+	t.Parallel()
+
 	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
