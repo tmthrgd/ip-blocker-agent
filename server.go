@@ -5,11 +5,7 @@
 
 package blocker
 
-/*
-#include <unistd.h>          // For sysconf and _SC_* constants
-
-#include "ngx_ip_blocker_shm.h"
-*/
+//#include <unistd.h>          // For sysconf and _SC_* constants
 import "C"
 
 import (
@@ -114,8 +110,8 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
-	lock := (*rwLock)(&header.lock)
+	header := (*shmHeader)(unsafe.Pointer(&data[0]))
+	lock := header.rwLocker()
 
 	lock.Create()
 
@@ -166,8 +162,8 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
-	lock := (*rwLock)(&header.lock)
+	header := (*shmHeader)(unsafe.Pointer(&data[0]))
+	lock := header.rwLocker()
 
 	copy(data[ip4BasePos:ip4BasePos+len(s.ip4s.Data):ip6BasePos], s.ip4s.Data)
 	copy(data[ip6BasePos:ip6BasePos+len(s.ip6s.Data):ip6rBasePos], s.ip6s.Data)
@@ -533,18 +529,10 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&s.data[0]))
+	header := (*shmHeader)(unsafe.Pointer(&s.data[0]))
 
 	ip4 = int(header.ip4.len / net.IPv4len)
 	ip6 = int(header.ip6.len / net.IPv6len)
 	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
 	return
-}
-
-func (s *Server) rwlockerForTest() *rwLock {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&s.data[0]))
-	return (*rwLock)(&header.lock)
 }

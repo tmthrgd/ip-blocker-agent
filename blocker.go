@@ -22,3 +22,9 @@ import (
 var ErrClosed = errors.New("shared memory closed")
 
 const headerSize = unsafe.Sizeof(C.ngx_ip_blocker_shm_st{})
+
+type shmHeader C.ngx_ip_blocker_shm_st
+
+func (h *shmHeader) rwLocker() *rwLock {
+	return (*rwLock)(&h.lock)
+}

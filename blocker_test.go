@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 var nameRand *rand.Rand
@@ -1281,7 +1282,8 @@ func TestServerRWLocker(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
-	lock := server.rwlockerForTest()
+	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	lock := header.rwLocker()
 	lock.Lock()
 	lock.Unlock()
 }
@@ -1298,7 +1300,8 @@ func TestClientRWLocker(t *testing.T) {
 	defer server.Close()
 	defer client.Close()
 
-	lock := client.rwlockerForTest()
+	header := (*shmHeader)(unsafe.Pointer(&client.data[0]))
+	lock := header.rwLocker()
 	lock.RLock()
 	lock.RUnlock()
 }
@@ -1899,8 +1902,8 @@ func BenchmarkClientRemap(b *testing.B) {
 	defer server.Close()
 	defer client.Close()
 
-	lock := client.rwlockerForTest()
-	lock.RLock()
+	header := (*shmHeader)(unsafe.Pointer(&client.data[0]))
+	header.rwLocker().RLock()
 
 	b.ResetTimer()
 
@@ -1912,8 +1915,8 @@ func BenchmarkClientRemap(b *testing.B) {
 
 	b.StopTimer()
 
-	lock = client.rwlockerForTest()
-	lock.RUnlock()
+	header = (*shmHeader)(unsafe.Pointer(&client.data[0]))
+	header.rwLocker().RUnlock()
 }
 
 func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int) {

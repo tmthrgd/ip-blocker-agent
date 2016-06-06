@@ -5,9 +5,6 @@
 
 package blocker
 
-//#include "ngx_ip_blocker_shm.h"
-import "C"
-
 import (
 	"errors"
 	"net"
@@ -58,8 +55,8 @@ func Open(name string) (*Client, error) {
 		return nil, err
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
-	lock := (*rwLock)(&header.lock)
+	header := (*shmHeader)(unsafe.Pointer(&data[0]))
+	lock := header.rwLocker()
 
 	client := &Client{
 		file: file,
@@ -89,8 +86,8 @@ func Open(name string) (*Client, error) {
 			return nil, err
 		}
 
-		header = (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&client.data[0]))
-		lock = (*rwLock)(&header.lock)
+		header = (*shmHeader)(unsafe.Pointer(&client.data[0]))
+		lock = header.rwLocker()
 	} else if !client.checkSharedMemory() {
 		lock.RUnlock()
 
@@ -119,7 +116,7 @@ func (c *Client) remap(force bool) (err error) {
 			return ErrClosed
 		}
 
-		header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
+		header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
 		if c.revision == uint32(header.revision) {
 			return nil
 		}
@@ -143,16 +140,15 @@ func (c *Client) remap(force bool) (err error) {
 		goto err
 	}
 
-	c.revision = uint32((*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0])).revision)
+	c.revision = uint32((*shmHeader)(unsafe.Pointer(&c.data[0])).revision)
 
 	err = syscall.Munmap(data)
 	return
 
 err:
 	if len(c.data) == 0 || len(c.data) >= int(headerSize) {
-		header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&data[0]))
-		lock := (*rwLock)(&header.lock)
-		lock.RUnlock()
+		header := (*shmHeader)(unsafe.Pointer(&data[0]))
+		header.rwLocker().RUnlock()
 	} else {
 		os.Stderr.WriteString("failed to release read lock")
 	}
@@ -166,7 +162,7 @@ func (c *Client) checkSharedMemory() bool {
 		panic(ErrClosed)
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
+	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
 
 	const maxInt = int(^uint(0) >> 1)
 	return len(c.data) >= int(headerSize) &&
@@ -200,8 +196,8 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		return false, errInvalidSharedMem
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
-	lock := (*rwLock)(&header.lock)
+	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
+	lock := header.rwLocker()
 
 	lock.RLock()
 
@@ -211,8 +207,8 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 			return false, err
 		}
 
-		header = (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
-		lock = (*rwLock)(&header.lock)
+		header = (*shmHeader)(unsafe.Pointer(&c.data[0]))
+		lock = header.rwLocker()
 	}
 
 	defer lock.RUnlock()
@@ -299,18 +295,10 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
+	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
 
 	ip4 = int(header.ip4.len / net.IPv4len)
 	ip6 = int(header.ip6.len / net.IPv6len)
 	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
 	return
-}
-
-func (c *Client) rwlockerForTest() *rwLock {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	header := (*C.ngx_ip_blocker_shm_st)(unsafe.Pointer(&c.data[0]))
-	return (*rwLock)(&header.lock)
 }
