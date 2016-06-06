@@ -43,7 +43,7 @@ func Open(name string) (*Client, error) {
 	size := stat.Size()
 	if size < int64(headerSize) {
 		file.Close()
-		return nil, errInvalidSharedMem
+		return nil, ErrInvalidSharedMem
 	}
 
 	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
@@ -55,7 +55,7 @@ func Open(name string) (*Client, error) {
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
 	if header.Version != 1 {
 		file.Close()
-		return nil, errInvalidSharedMem
+		return nil, ErrInvalidSharedMem
 	}
 
 	client := &Client{
@@ -94,7 +94,7 @@ func Open(name string) (*Client, error) {
 
 		syscall.Munmap(data)
 		file.Close()
-		return nil, errInvalidSharedMem
+		return nil, ErrInvalidSharedMem
 	}
 
 	lock.RUnlock()
@@ -137,7 +137,7 @@ func (c *Client) remap(force bool) (err error) {
 	}
 
 	if !c.checkSharedMemory() {
-		err = errInvalidSharedMem
+		err = ErrInvalidSharedMem
 		goto err
 	}
 
@@ -194,7 +194,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 	}
 
 	if len(c.data) < int(headerSize) {
-		return false, errInvalidSharedMem
+		return false, ErrInvalidSharedMem
 	}
 
 	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
@@ -292,7 +292,7 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 	}
 
 	if len(c.data) < int(headerSize) {
-		err = errInvalidSharedMem
+		err = ErrInvalidSharedMem
 		return
 	}
 

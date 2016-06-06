@@ -798,11 +798,11 @@ func TestClientCorrupted(t *testing.T) {
 
 	client.data = client.data[:headerSize-1]
 
-	if _, err = client.Contains(net.IPv4zero); err != errInvalidSharedMem {
+	if _, err = client.Contains(net.IPv4zero); err != ErrInvalidSharedMem {
 		t.Error(err)
 	}
 
-	if _, _, _, err = client.Count(); err != errInvalidSharedMem {
+	if _, _, _, err = client.Count(); err != ErrInvalidSharedMem {
 		t.Error(err)
 	}
 }

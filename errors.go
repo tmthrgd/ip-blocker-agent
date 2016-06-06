@@ -22,5 +22,8 @@ var (
 	// not previously been called.
 	ErrNotBatching = errors.New("not batching")
 
-	errInvalidSharedMem = errors.New("invalid shared memory")
+	// ErrInvalidSharedMem will be returned in most Client
+	// functions if the backing shared memory is invalid at
+	// the time of the call.
+	ErrInvalidSharedMem = errors.New("invalid shared memory")
 )
