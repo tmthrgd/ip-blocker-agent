@@ -1287,6 +1287,8 @@ func TestAddLargeRange(t *testing.T) {
 }
 
 func TestServerRWLocker(t *testing.T) {
+	t.Parallel()
+
 	server, _, err := setup(false)
 	if err != nil {
 		t.Error(err)
@@ -1302,6 +1304,8 @@ func TestServerRWLocker(t *testing.T) {
 }
 
 func TestClientRWLocker(t *testing.T) {
+	t.Parallel()
+
 	server, client, err := setup(true)
 	if err != nil {
 		t.Error(err)
