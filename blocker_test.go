@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 	"testing"
 )
 
@@ -1353,6 +1354,124 @@ func TestUnlinkEmptyName(t *testing.T) {
 
 	if err := Unlink(""); err != syscall.EINVAL {
 		t.Error("Unlink did not return EINVAL for empty name")
+	}
+}
+
+func testPanic(fn func()) (didPanic bool) {
+	defer func() {
+		didPanic = recover() != nil
+	}()
+
+	fn()
+	return
+}
+
+func TestClosedPanics(t *testing.T) {
+	server, client, err := setup(true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	client.Close()
+	server.Close()
+	server.Unlink()
+
+	if !testPanic(func() {
+		client.remap(true)
+	}) {
+		t.Error("(*Client).remap did not panic on closed")
+	}
+
+	if !testPanic(func() {
+		client.checkSharedMemory()
+	}) {
+		t.Error("(*Client).checkSharedMemory did not panic on closed")
+	}
+}
+
+func TestClosedErrors(t *testing.T) {
+	server, client, err := setup(true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	client.mu.RLock()
+	done := make(chan struct{}, 1)
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Error("(*Client).remap panicked on closed with mutex lock, got %v", err)
+			}
+
+			done <- struct{}{}
+		}()
+
+		client.mu.RLock()
+		if err := client.remap(false); err != ErrClosed {
+			t.Error("(*Client).remap did not return ErrClosed on closed with mutex lock, got %v", err)
+		} else {
+			client.mu.RUnlock()
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	client.closed = true
+	client.mu.RUnlock()
+	<-done
+	client.closed = false
+
+	client.Close()
+	server.Close()
+	server.Unlink()
+
+	if err = server.Commit(); err != ErrClosed {
+		t.Error("(*Server).Commit did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.Insert(nil); err != ErrClosed {
+		t.Error("(*Server).Insert did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.Remove(nil); err != ErrClosed {
+		t.Error("(*Server).Remove did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.InsertRange(nil, nil); err != ErrClosed {
+		t.Error("(*Server).Insert did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.RemoveRange(nil, nil); err != ErrClosed {
+		t.Error("(*Server).Remove did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.Clear(); err != ErrClosed {
+		t.Error("(*Server).Clear did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.Batch(); err != ErrClosed {
+		t.Error("(*Server).Batch did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.Close(); err != ErrClosed {
+		t.Error("(*Server).Close did not return ErrClosed on closed, got %v", err)
+	}
+
+	if _, _, _, err = server.Count(); err != ErrClosed {
+		t.Error("(*Server).Count did not return ErrClosed on closed, got %v", err)
+	}
+
+	if _, err = client.Contains(nil); err != ErrClosed {
+		t.Error("(*Client).Contains did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = client.Close(); err != ErrClosed {
+		t.Error("(*Client).Close did not return ErrClosed on closed, got %v", err)
+	}
+
+	if _, _, _, err = client.Count(); err != ErrClosed {
+		t.Error("(*Client).Count did not return ErrClosed on closed, got %v", err)
 	}
 }
 
