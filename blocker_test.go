@@ -75,8 +75,7 @@ func insertRemoveRangeSlowHook(insert bool, ip net.IP, ipnet *net.IPNet, ips *bi
 func testAddress(t *testing.T, addrs ...string) {
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -146,8 +145,7 @@ func TestMixed(t *testing.T) {
 func testRange(t *testing.T, ipranges []string, addrs ...string) {
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -168,12 +166,11 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
-			t.Error(err)
+			panic(err)
 		}
 
 		if err = server.InsertRange(ip, ipnet); err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
@@ -186,19 +183,17 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 
 		if !has {
 			t.Errorf("blocklist does not contain entry after insert: %v, %s", ipranges, addr)
-			continue
 		}
 	}
 
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
-			t.Error(err)
+			panic(err)
 		}
 
 		if err = server.RemoveRange(ip, ipnet); err != nil {
-			t.Error(err)
-			return
+			t.Fatal(err)
 		}
 	}
 
@@ -245,8 +240,7 @@ func TestMixedRange(t *testing.T) {
 func testClear(t *testing.T, addrs ...string) {
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -271,18 +265,15 @@ func testClear(t *testing.T, addrs ...string) {
 		has, err = client.Contains(net.ParseIP(addr))
 		if err != nil {
 			t.Error(err)
-			continue
 		}
 
 		if !has {
 			t.Error("blocklist does not contain entry after insert")
-			continue
 		}
 	}
 
 	if err = server.Clear(); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	for _, addr := range addrs {
@@ -318,8 +309,7 @@ func TestClearMixed(t *testing.T) {
 func TestClear2(t *testing.T) {
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -370,8 +360,7 @@ func TestBatch(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -433,8 +422,7 @@ func TestServerClose(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -454,8 +442,7 @@ func TestClientClose(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -476,8 +463,7 @@ func TestUnlink(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -497,8 +483,7 @@ func TestUnlink(t *testing.T) {
 
 	server, _, err = setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -522,8 +507,7 @@ func TestServerName(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -539,8 +523,7 @@ func TestClientName(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -561,8 +544,7 @@ func TestServerCount(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -739,8 +721,7 @@ func TestClientCount(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -807,8 +788,7 @@ func TestClientCount(t *testing.T) {
 func TestClientCorrupted(t *testing.T) {
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	server.Close()
@@ -829,8 +809,7 @@ func TestClientCorrupted(t *testing.T) {
 func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) {
 	server1, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server1.Unlink()
@@ -838,8 +817,7 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 
 	server2, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server2.Unlink()
@@ -897,7 +875,7 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
-			t.Error(err)
+			panic(err)
 		}
 
 		if rand.Intn(2) == 0 {
@@ -1009,8 +987,7 @@ func TestBinarySearcherInsertRangeMixed(t *testing.T) {
 func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) {
 	server1, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server1.Unlink()
@@ -1018,8 +995,7 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 
 	server2, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server2.Unlink()
@@ -1072,7 +1048,7 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
-			t.Error(err)
+			panic(err)
 		}
 
 		if err = server1.InsertRange(ip, ipnet); err != nil {
@@ -1105,7 +1081,7 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
-			t.Error(err)
+			panic(err)
 		}
 
 		doInsertRemoveRangeHook = insertRemoveRangeSlowHook
@@ -1193,8 +1169,7 @@ func TestInsertRangeWithLastAlready(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1214,7 +1189,7 @@ func TestInsertRangeWithLastAlready(t *testing.T) {
 
 	ip, ipnet, err := net.ParseCIDR("192.0.2.0/24")
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
 
 	if err = server.InsertRange(ip, ipnet); err != nil {
@@ -1236,8 +1211,7 @@ func TestRemoveRangeNonExistAtEnd(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1249,7 +1223,7 @@ func TestRemoveRangeNonExistAtEnd(t *testing.T) {
 
 	ip, ipnet, err := net.ParseCIDR("192.0.2.0/30")
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
 
 	if err = server.RemoveRange(ip, ipnet); err != nil {
@@ -1271,8 +1245,7 @@ func TestAddLargeRange(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1280,7 +1253,7 @@ func TestAddLargeRange(t *testing.T) {
 
 	ip, ipnet, err := net.ParseCIDR("192.0.2.0/12")
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
 
 	if err = server.InsertRange(ip, ipnet); err != nil {
@@ -1302,8 +1275,7 @@ func TestServerRWLocker(t *testing.T) {
 
 	server, _, err := setup(false)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1319,8 +1291,7 @@ func TestClientRWLocker(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1390,8 +1361,7 @@ func TestClosedPanics(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	client.Close()
@@ -1416,8 +1386,7 @@ func TestClosedErrors(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	client.mu.RLock()
@@ -1503,8 +1472,7 @@ func TestInvalidAddr(t *testing.T) {
 
 	server, client, err := setup(true)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1623,8 +1591,7 @@ func BenchmarkNew(b *testing.B) {
 func BenchmarkOpen(b *testing.B) {
 	server, _, err := setup(false)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1652,8 +1619,7 @@ func BenchmarkOpen(b *testing.B) {
 func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
 	server, _, err := setup(false)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1732,8 +1698,7 @@ func BenchmarkInsertBatchIP6(b *testing.B) {
 func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
 	server, _, err := setup(false)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1812,8 +1777,7 @@ func BenchmarkRemoveBatchIP6(b *testing.B) {
 func benchmarkContains(b *testing.B, addr string, extra int) {
 	server, client, err := setup(true)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1849,7 +1813,6 @@ func benchmarkContains(b *testing.B, addr string, extra int) {
 
 		if !has {
 			b.Error("blocklist does not contain IP")
-			return
 		}
 	}
 }
@@ -1873,8 +1836,7 @@ func BenchmarkContainsIP6(b *testing.B) {
 func benchmarkCommit(b *testing.B, extra int) {
 	server, _, err := setup(false)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1930,8 +1892,7 @@ func BenchmarkCommit(b *testing.B) {
 func BenchmarkClientRemap(b *testing.B) {
 	server, client, err := setup(true)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
@@ -1945,8 +1906,7 @@ func BenchmarkClientRemap(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		if err = client.remap(true); err != nil {
-			b.Error(err)
-			return
+			b.Fatal(err)
 		}
 	}
 
@@ -1959,8 +1919,7 @@ func BenchmarkClientRemap(b *testing.B) {
 func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int) {
 	server, _, err := setup(false)
 	if err != nil {
-		b.Error(err)
-		return
+		b.Fatal(err)
 	}
 
 	defer server.Unlink()
