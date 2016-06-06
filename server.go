@@ -320,9 +320,9 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 
 	for left >= 0 {
 		var num int
-		if left > 32 {
-			num = 1 << 32
-			left -= 32
+		if left > 30 {
+			num = 1 << 30
+			left -= 30
 		} else {
 			num = 1 << uint(left)
 			left = -1

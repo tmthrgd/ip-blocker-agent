@@ -69,24 +69,24 @@ func subBytesBigInt(ip1, ip2 []byte) int {
 	return int(c.Int64())
 }
 
-func testSubtraction(t *testing.T, a, b *big.Int, expect, pad int) {
+func testSubtraction(t *testing.T, a, b *big.Int, expect int64, pad int) {
 	ip1 := a.Bytes()
 	ip1 = append(make([]byte, pad-len(ip1)), ip1...)
 	ip2 := b.Bytes()
 	ip2 = append(make([]byte, pad-len(ip2)), ip2...)
 
-	if x := subBytesBigInt(ip1, ip2); x != expect {
+	if x := subBytesBigInt(ip1, ip2); int64(x) != expect {
 		t.Errorf("subBytesBigInt failed for %s - %s, expected %d, got %d", a, b, expect, x)
 	}
 
-	if x := subBytes(ip1, ip2); x != expect {
+	if x := subBytes(ip1, ip2); int64(x) != expect {
 		t.Errorf("subBytes failed for %s - %s, expected %d, got %d", a, b, expect, x)
 	}
 
-	if x := subBytes32(ip1, ip2); x != expect {
+	if x := subBytes32(ip1, ip2); int64(x) != expect {
 		const maxInt32 = int32(^uint32(0) >> 1)
 
-		if x != maxInt || expect <= int(maxInt32) {
+		if x != maxInt || expect <= int64(maxInt32) {
 			t.Errorf("subBytes32 failed for %s - %s, expected %d, got %d", a, b, expect, x)
 		}
 	}
@@ -99,27 +99,27 @@ func TestSubtraction(t *testing.T) {
 
 	testSubtraction(t, big.NewInt(10000), big.NewInt(7321), 10000-7321, 16)
 	testSubtraction(t, maxIntBig, maxIntBig, 0, 16)
-	testSubtraction(t, maxIntBig, bigIntZero, maxInt, 16)
+	testSubtraction(t, maxIntBig, bigIntZero, int64(maxInt), 16)
 	testSubtraction(t, bigIntZero, bigIntZero, 0, 16)
-	testSubtraction(t, big.NewInt(int64(maxInt>>1)), big.NewInt(int64(maxInt>>2)), maxInt>>2+1, 16)
+	testSubtraction(t, big.NewInt(int64(maxInt>>1)), big.NewInt(int64(maxInt>>2)), int64(maxInt>>2+1), 16)
 
 	const maxInt64 = int64(^uint64(0) >> 1)
 	testSubtraction(t, big.NewInt(maxInt64), big.NewInt(maxInt64), 0, 16)
 
 	maxInt64Lsh1 := new(big.Int).Lsh(big.NewInt(maxInt64), 1)
 	testSubtraction(t, maxInt64Lsh1, maxInt64Lsh1, 0, 16)
-	testSubtraction(t, maxInt64Lsh1, big.NewInt(maxInt64), maxInt, 16)
-	testSubtraction(t, maxInt64Lsh1, bigIntZero, maxInt, 16)
-	testSubtraction(t, maxInt64Lsh1, bigIntZero, maxInt, 16)
+	testSubtraction(t, maxInt64Lsh1, big.NewInt(maxInt64), int64(maxInt), 16)
+	testSubtraction(t, maxInt64Lsh1, bigIntZero, int64(maxInt), 16)
+	testSubtraction(t, maxInt64Lsh1, bigIntZero, int64(maxInt), 16)
 
 	if maxInt64 <= int64(maxInt) {
-		testSubtraction(t, big.NewInt(maxInt64), big.NewInt(maxInt64>>1), int(maxInt64>>1+1), 16)
-		testSubtraction(t, big.NewInt(maxInt64), bigIntZero, int(maxInt64), 16)
-		testSubtraction(t, big.NewInt(maxInt64>>1), bigIntZero, int(maxInt64>>1), 16)
+		testSubtraction(t, big.NewInt(maxInt64), big.NewInt(maxInt64>>1), int64(maxInt64>>1+1), 16)
+		testSubtraction(t, big.NewInt(maxInt64), bigIntZero, int64(maxInt64), 16)
+		testSubtraction(t, big.NewInt(maxInt64>>1), bigIntZero, int64(maxInt64>>1), 16)
 	} else {
-		testSubtraction(t, big.NewInt(maxInt64), big.NewInt(maxInt64>>1), maxInt, 16)
-		testSubtraction(t, big.NewInt(maxInt64), bigIntZero, maxInt, 16)
-		testSubtraction(t, big.NewInt(maxInt64>>1), bigIntZero, maxInt, 16)
+		testSubtraction(t, big.NewInt(maxInt64), big.NewInt(maxInt64>>1), int64(maxInt), 16)
+		testSubtraction(t, big.NewInt(maxInt64), bigIntZero, int64(maxInt), 16)
+		testSubtraction(t, big.NewInt(maxInt64>>1), bigIntZero, int64(maxInt), 16)
 	}
 
 	testSubtraction(t, big.NewInt(10000), big.NewInt(7321), 10000-7321, 8)
