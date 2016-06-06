@@ -151,7 +151,7 @@ err:
 		header := (*shmHeader)(unsafe.Pointer(&data[0]))
 		header.rwLocker().RUnlock()
 	} else {
-		os.Stderr.WriteString("failed to release read lock")
+		err = LockReleaseFailedError{err}
 	}
 
 	syscall.Munmap(data)

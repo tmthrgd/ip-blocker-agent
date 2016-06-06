@@ -27,3 +27,22 @@ var (
 	// the time of the call.
 	ErrInvalidSharedMemory = errors.New("invalid shared memory")
 )
+
+// LockReleaseFailedError records that a lock could not
+// be released and any error that was occuring.
+//
+// LockReleaseFailedError are serious errors and may mean
+// that shared memory is in an invalid state and no further
+// writes to shared memory by the server process will be
+// possible.
+type LockReleaseFailedError struct {
+	Err error
+}
+
+func (e LockReleaseFailedError) Error() string {
+	if e.Err == nil {
+		return "failed to release read lock"
+	}
+
+	return "failed to release read lock: " + e.Err.Error()
+}
