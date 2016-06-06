@@ -95,11 +95,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 
 	header.Revision = 1
 
-	if ^uint(0) == uint(^uint32(0)) {
-		atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), 2)
-	} else {
-		atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), 1)
-	}
+	atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), version)
 
 	return &Server{
 		file: file,

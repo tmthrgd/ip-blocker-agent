@@ -48,4 +48,6 @@ const (
 	headerSize = 0xa0
 
 	rwLockMaxReaders = 0x40000000
+
+	version = uint32((^uint(0)>>32)&0x80000000) | 0x00000001
 )
