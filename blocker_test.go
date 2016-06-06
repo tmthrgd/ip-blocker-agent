@@ -1489,6 +1489,109 @@ func TestClosedErrors(t *testing.T) {
 	}
 }
 
+func TestInvalidAddr(t *testing.T) {
+	t.Parallel()
+
+	server, client, err := setup(true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	err = server.Insert(nil)
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).Insert did not return a net.AddrError with invalid address")
+	}
+
+	var invl [100]byte
+	err = server.Insert(invl[:])
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).Insert did not return a net.AddrError with invalid address")
+	}
+
+	var invl2 [7]byte
+	err = server.Insert(invl2[:])
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).Insert did not return a net.AddrError with invalid address")
+	}
+
+	err = server.Remove(invl[:])
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).Remove did not return a net.AddrError with invalid address")
+	}
+
+	err = server.InsertRange(nil, new(net.IPNet))
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).InsertRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.InsertRange(nil, &net.IPNet{
+		IP:   net.IPv4zero,
+		Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0xff),
+	})
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).InsertRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.InsertRange(invl[:], new(net.IPNet))
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).InsertRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.InsertRange(invl[:], &net.IPNet{
+		IP:   net.IPv4zero,
+		Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0xff),
+	})
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).InsertRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.InsertRange(invl2[:], new(net.IPNet))
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).InsertRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.InsertRange(invl2[:], &net.IPNet{
+		IP:   net.IPv4zero,
+		Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0xff),
+	})
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).InsertRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.RemoveRange(invl[:], new(net.IPNet))
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).RemoveRange did not return a net.AddrError with invalid address")
+	}
+
+	err = server.RemoveRange(invl[:], &net.IPNet{
+		IP:   net.IPv4zero,
+		Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0xff),
+	})
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Server).RemoveRange did not return a net.AddrError with invalid address")
+	}
+
+	_, err = client.Contains(nil)
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Client).Contains did not return a net.AddrError with invalid address")
+	}
+
+	_, err = client.Contains(invl[:])
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Client).Contains did not return a net.AddrError with invalid address")
+	}
+
+	_, err = client.Contains(invl2[:])
+	if _, ok := err.(*net.AddrError); !ok {
+		t.Error("(*Client).Contains did not return a net.AddrError with invalid address")
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
