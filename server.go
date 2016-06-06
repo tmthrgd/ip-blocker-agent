@@ -5,7 +5,7 @@
 
 package blocker
 
-//#include <unistd.h>          // For sysconf and _SC_* constants
+//#include <unistd.h>          // For ssize_t
 import "C"
 
 import (
@@ -29,10 +29,9 @@ var (
 	ErrNotBatching = errors.New("not batching")
 )
 
-var (
-	cachelineSize int
-	pageSize      int
-)
+const cachelineSize = 64
+
+var pageSize = os.Getpagesize()
 
 /* ngx_align, taken from ngx_config.h */
 func align(d, a int) int {
@@ -46,16 +45,6 @@ func calculateOffsets(base, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos
 	end = align(ip6rBasePos+ip6rLen, cachelineSize)
 	size = align(end, pageSize)
 	return
-}
-
-func init() {
-	pageSize = os.Getpagesize()
-
-	if csize, err := C.sysconf(C._SC_LEVEL1_DCACHE_LINESIZE); err == nil {
-		cachelineSize = int(csize)
-	} else {
-		cachelineSize = 64
-	}
 }
 
 // Unlink removes the previously created blocker.
