@@ -334,26 +334,32 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 
 	if doInsertRemoveRangeHook != nil {
 		doInsertRemoveRangeHook(insert, ip, ipnet, ips)
-	} else {
-		base := ip[:ips.Size()]
-		ones, _ := ipnet.Mask.Size()
-		left := len(base)*8 - ones
 
-		for left >= 0 {
-			var num int
-			if left > 32 {
-				num = 1 << 32
-				left -= 32
-			} else {
-				num = 1 << uint(left)
-				left = -1
-			}
+		if s.batching {
+			return nil
+		}
 
-			if insert {
-				base = ips.insertRange(base, num)
-			} else {
-				base = ips.removeRange(base, num)
-			}
+		return s.commit()
+	}
+
+	base := ip[:ips.Size()]
+	ones, _ := ipnet.Mask.Size()
+	left := len(base)*8 - ones
+
+	for left >= 0 {
+		var num int
+		if left > 32 {
+			num = 1 << 32
+			left -= 32
+		} else {
+			num = 1 << uint(left)
+			left = -1
+		}
+
+		if insert {
+			base = ips.insertRange(base, num)
+		} else {
+			base = ips.removeRange(base, num)
 		}
 	}
 
