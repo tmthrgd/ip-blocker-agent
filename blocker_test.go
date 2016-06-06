@@ -17,6 +17,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -1319,6 +1320,40 @@ func TestClientRWLocker(t *testing.T) {
 	lock := client.rwlockerForTest()
 	lock.RLock()
 	lock.RUnlock()
+}
+
+func TestOpenNonExist(t *testing.T) {
+	t.Parallel()
+
+	client, err := Open("/go-test-bogus-name")
+	if err == nil {
+		client.Close()
+	}
+
+	if !os.IsNotExist(err) {
+		t.Error("Open did not return non exist error for bogus name")
+	}
+}
+
+func TestOpenEmptyName(t *testing.T) {
+	t.Parallel()
+
+	client, err := Open("")
+	if err == nil {
+		client.Close()
+	}
+
+	if err != syscall.EINVAL {
+		t.Error("Open did not return EINVAL for empty name")
+	}
+}
+
+func TestUnlinkEmptyName(t *testing.T) {
+	t.Parallel()
+
+	if err := Unlink(""); err != syscall.EINVAL {
+		t.Error("Unlink did not return EINVAL for empty name")
+	}
 }
 
 func BenchmarkNew(b *testing.B) {
