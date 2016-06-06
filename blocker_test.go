@@ -832,10 +832,8 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 		t.Error(err)
 	}
 
-	defer func() {
-		doInsertRemoveRangeHook = nil
-	}()
-	doInsertRemoveRangeHook = insertRemoveRangeSlowHook
+	server1.doInsertRemoveRangeHook = insertRemoveRangeSlowHook
+	server2.doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 
 	extraIP := make(net.IP, net.IPv6len)
 
@@ -873,6 +871,8 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 		}
 	}
 
+	server2.doInsertRemoveRangeHook = nil
+
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
@@ -905,12 +905,10 @@ func testBinarySearcherInsertRange(t *testing.T, extra int, ipranges ...string) 
 			}
 		}
 
-		doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 		if err = server1.InsertRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
 
-		doInsertRemoveRangeHook = nil
 		if err = server2.InsertRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
@@ -1075,9 +1073,7 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 		}
 	}
 
-	defer func() {
-		doInsertRemoveRangeHook = nil
-	}()
+	server1.doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
@@ -1085,12 +1081,10 @@ func testBinarySearcherRemoveRange(t *testing.T, extra int, ipranges ...string) 
 			panic(err)
 		}
 
-		doInsertRemoveRangeHook = insertRemoveRangeSlowHook
 		if err = server1.RemoveRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}
 
-		doInsertRemoveRangeHook = nil
 		if err = server2.RemoveRange(ip, ipnet); err != nil {
 			t.Error(err)
 		}

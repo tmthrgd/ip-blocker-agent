@@ -74,6 +74,8 @@ type Server struct {
 
 	closed   bool
 	batching bool
+
+	doInsertRemoveRangeHook func(insert bool, ip net.IP, ipnet *net.IPNet, ips *binarySearcher) // for testing
 }
 
 // New creates a new IP blocker shared memory server
@@ -285,8 +287,6 @@ func (s *Server) Remove(ip net.IP) error {
 	return s.doInsertRemove(ip, false)
 }
 
-var doInsertRemoveRangeHook func(insert bool, ip net.IP, ipnet *net.IPNet, ips *binarySearcher) // for testing
-
 func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -317,8 +317,8 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
-	if doInsertRemoveRangeHook != nil {
-		doInsertRemoveRangeHook(insert, ip, ipnet, ips)
+	if s.doInsertRemoveRangeHook != nil {
+		s.doInsertRemoveRangeHook(insert, ip, ipnet, ips)
 
 		if s.batching {
 			return nil
