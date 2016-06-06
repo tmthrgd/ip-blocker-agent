@@ -6,24 +6,11 @@
 package blocker
 
 import (
-	"errors"
 	"net"
 	"os"
 	"sync"
 	"syscall"
 	"unsafe"
-)
-
-var (
-	// ErrAlreadyBatching will be returned on attempts to call
-	// (*Server).Batch() when the *Server is already
-	// batching.
-	ErrAlreadyBatching = errors.New("already batching")
-
-	// ErrNotBatching will be returned on attempts to call
-	// (*Server).Commit() when (*Server).Batch() has
-	// not previously been called.
-	ErrNotBatching = errors.New("not batching")
 )
 
 const cachelineSize = 64

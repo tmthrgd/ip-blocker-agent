@@ -6,15 +6,12 @@
 package blocker
 
 import (
-	"errors"
 	"net"
 	"os"
 	"sync"
 	"syscall"
 	"unsafe"
 )
-
-var errInvalidSharedMem = errors.New("invalid shared memory")
 
 // Client is an IP blocker shared memory client.
 type Client struct {

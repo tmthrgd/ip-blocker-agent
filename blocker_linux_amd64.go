@@ -3,10 +3,6 @@
 
 package blocker
 
-import "errors"
-
-var ErrClosed = errors.New("shared memory closed")
-
 type mutex struct {
 	Sem [32]byte
 }

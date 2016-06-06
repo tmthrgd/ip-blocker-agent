@@ -5,10 +5,6 @@
 
 // +build !linux !386,!amd64
 
-// Package blocker is an efficient shared memory IP
-// blocking system for nginx.
-//
-// See https://github.com/tmthrgd/nginx-ip-blocker
 package blocker
 
 /*
@@ -44,12 +40,6 @@ typedef struct {
 } ip_blocker_shm_st;
 */
 import "C"
-
-import "errors"
-
-// ErrClosed will be returned on attempts to call
-// methods on a closed server or client.
-var ErrClosed = errors.New("shared memory closed")
 
 type mutex C.ip_blocker_mutex_st
 
