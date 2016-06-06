@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -54,9 +55,10 @@ func Open(name string) (*Client, error) {
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
 
+	version := atomic.LoadUint32((*uint32)(unsafe.Pointer(&header.Version)))
 	switch {
-	case ^uint(0) == uint(^uint32(0)) && header.Version == 2:
-	case ^uint(0) != uint(^uint32(0)) && header.Version == 1:
+	case ^uint(0) == uint(^uint32(0)) && version == 2:
+	case ^uint(0) != uint(^uint32(0)) && version == 1:
 	default:
 		file.Close()
 		return nil, ErrInvalidSharedMemory

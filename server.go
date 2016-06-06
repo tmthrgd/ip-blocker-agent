@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -87,22 +88,18 @@ func New(name string, perm os.FileMode) (*Server, error) {
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
 
-	if ^uint(0) == uint(^uint32(0)) {
-		header.Version = 2
-	} else {
-		header.Version = 1
-	}
-
 	lock := header.rwLocker()
 	lock.Create()
-
-	lock.Lock()
 
 	header.setBlocks(ip4BasePos, 0, ip6BasePos, 0, ip6rBasePos, 0)
 
 	header.Revision = 1
 
-	lock.Unlock()
+	if ^uint(0) == uint(^uint32(0)) {
+		atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), 2)
+	} else {
+		atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), 1)
+	}
 
 	return &Server{
 		file: file,
