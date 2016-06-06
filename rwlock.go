@@ -4,9 +4,6 @@
 
 package blocker
 
-//#include "ngx_ip_blocker_shm.h"
-import "C"
-
 import (
 	"sync/atomic"
 
@@ -18,24 +15,26 @@ import (
 // or a single writer.
 // rwLocks can be created as part of other structures.
 // Create must be called before use.
-type rwLock C.ngx_ip_blocker_rwlock_st
+//
+// type rwLock C.ip_blocker_rwlock_st
+// 	see blocker.go
 
 func (rw *rwLock) Create() {
-	w := (*mutex)(&rw.w)
+	w := (*mutex)(&rw.W)
 	w.Create()
 
-	writerSem := (*sem.Semaphore)(&rw.writer_sem)
+	writerSem := (*sem.Semaphore)(&rw.WriterSem)
 	if err := writerSem.Init(0); err != nil {
 		panic(err)
 	}
 
-	readerSem := (*sem.Semaphore)(&rw.reader_sem)
+	readerSem := (*sem.Semaphore)(&rw.ReaderSem)
 	if err := readerSem.Init(0); err != nil {
 		panic(err)
 	}
 
-	rw.reader_count = 0
-	rw.reader_wait = 0
+	rw.ReaderCount = 0
+	rw.ReaderWait = 0
 }
 
 // Lock locks rw for writing.
@@ -46,15 +45,15 @@ func (rw *rwLock) Create() {
 // the lock.
 func (rw *rwLock) Lock() {
 	// First, resolve competition with other writers.
-	w := (*mutex)(&rw.w)
+	w := (*mutex)(&rw.W)
 	w.Lock()
 
 	// Announce to readers there is a pending writer.
-	r := atomic.AddInt32((*int32)(&rw.reader_count), -C.NGX_IP_BLOCKER_MAX_READERS) + C.NGX_IP_BLOCKER_MAX_READERS
+	r := atomic.AddInt32((*int32)(&rw.ReaderCount), -rwLockMaxReaders) + rwLockMaxReaders
 
 	// Wait for active readers.
-	if r != 0 && atomic.AddInt32((*int32)(&rw.reader_wait), r) != 0 {
-		writerSem := (*sem.Semaphore)(&rw.writer_sem)
+	if r != 0 && atomic.AddInt32((*int32)(&rw.ReaderWait), r) != 0 {
+		writerSem := (*sem.Semaphore)(&rw.WriterSem)
 		if err := writerSem.Wait(); err != nil {
 			panic(err)
 		}
@@ -69,13 +68,13 @@ func (rw *rwLock) Lock() {
 // arrange for another goroutine to RUnlock (Unlock) it.
 func (rw *rwLock) Unlock() {
 	// Announce to readers there is no active writer.
-	r := atomic.AddInt32((*int32)(&rw.reader_count), C.NGX_IP_BLOCKER_MAX_READERS)
-	if r >= C.NGX_IP_BLOCKER_MAX_READERS {
+	r := atomic.AddInt32((*int32)(&rw.ReaderCount), rwLockMaxReaders)
+	if r >= rwLockMaxReaders {
 		panic("sync: Unlock of unlocked rwLock")
 	}
 
 	// Unblock blocked readers, if any.
-	readerSem := (*sem.Semaphore)(&rw.reader_sem)
+	readerSem := (*sem.Semaphore)(&rw.ReaderSem)
 	for i := 0; i < int(r); i++ {
 		if err := readerSem.Post(); err != nil {
 			panic(err)
@@ -83,15 +82,15 @@ func (rw *rwLock) Unlock() {
 	}
 
 	// Allow other writers to proceed.
-	w := (*mutex)(&rw.w)
+	w := (*mutex)(&rw.W)
 	w.Unlock()
 }
 
 // RLock locks rw for reading.
 func (rw *rwLock) RLock() {
-	if atomic.AddInt32((*int32)(&rw.reader_count), 1) < 0 {
+	if atomic.AddInt32((*int32)(&rw.ReaderCount), 1) < 0 {
 		// A writer is pending, wait for it.
-		readerSem := (*sem.Semaphore)(&rw.reader_sem)
+		readerSem := (*sem.Semaphore)(&rw.ReaderSem)
 		if err := readerSem.Wait(); err != nil {
 			panic(err)
 		}
@@ -103,15 +102,15 @@ func (rw *rwLock) RLock() {
 // It is a run-time error if rw is not locked for reading
 // on entry to RUnlock.
 func (rw *rwLock) RUnlock() {
-	if r := atomic.AddInt32((*int32)(&rw.reader_count), -1); r < 0 {
-		if r+1 == 0 || r+1 == -C.NGX_IP_BLOCKER_MAX_READERS {
+	if r := atomic.AddInt32((*int32)(&rw.ReaderCount), -1); r < 0 {
+		if r+1 == 0 || r+1 == -rwLockMaxReaders {
 			panic("sync: RUnlock of unlocked rwLock")
 		}
 
 		// A writer is pending.
-		if atomic.AddInt32((*int32)(&rw.reader_wait), -1) == 0 {
+		if atomic.AddInt32((*int32)(&rw.ReaderWait), -1) == 0 {
 			// The last reader unblocks the writer.
-			writerSem := (*sem.Semaphore)(&rw.writer_sem)
+			writerSem := (*sem.Semaphore)(&rw.WriterSem)
 			if err := writerSem.Post(); err != nil {
 				panic(err)
 			}

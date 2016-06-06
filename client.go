@@ -56,7 +56,7 @@ func Open(name string) (*Client, error) {
 	}
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
-	if header.version != 1 {
+	if header.Version != 1 {
 		file.Close()
 		return nil, errInvalidSharedMem
 	}
@@ -70,7 +70,7 @@ func Open(name string) (*Client, error) {
 	lock := header.rwLocker()
 	lock.RLock()
 
-	client.revision = uint32(header.revision)
+	client.revision = uint32(header.Revision)
 
 	stat, err = file.Stat()
 	if err != nil {
@@ -121,7 +121,7 @@ func (c *Client) remap(force bool) (err error) {
 		}
 
 		header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
-		if c.revision == uint32(header.revision) {
+		if c.revision == uint32(header.Revision) {
 			return nil
 		}
 	}
@@ -144,7 +144,7 @@ func (c *Client) remap(force bool) (err error) {
 		goto err
 	}
 
-	c.revision = uint32((*shmHeader)(unsafe.Pointer(&c.data[0])).revision)
+	c.revision = uint32((*shmHeader)(unsafe.Pointer(&c.data[0])).Revision)
 
 	err = syscall.Munmap(data)
 	return
@@ -170,20 +170,20 @@ func (c *Client) checkSharedMemory() bool {
 
 	const maxInt = int(^uint(0) >> 1)
 	return len(c.data) >= int(headerSize) &&
-		uintptr(headerSize)+uintptr(header.ip4.len+header.ip6.len+header.ip6route.len) <= uintptr(maxInt) &&
-		len(c.data) >= int(headerSize)+int(header.ip4.len+header.ip6.len+header.ip6route.len) &&
-		(header.ip4.len == 0 || uintptr(header.ip4.base) >= headerSize) &&
-		(header.ip6.len == 0 || uintptr(header.ip6.base) >= headerSize) &&
-		(header.ip6route.len == 0 || uintptr(header.ip6route.base) >= headerSize) &&
-		uintptr(header.ip4.base)+uintptr(header.ip4.len) <= uintptr(maxInt) &&
-		uintptr(header.ip6.base)+uintptr(header.ip6.len) <= uintptr(maxInt) &&
-		uintptr(header.ip6route.base)+uintptr(header.ip6route.len) <= uintptr(maxInt) &&
-		int(uintptr(header.ip4.base)+uintptr(header.ip4.len)) <= len(c.data) &&
-		int(uintptr(header.ip6.base)+uintptr(header.ip6.len)) <= len(c.data) &&
-		int(uintptr(header.ip6route.base)+uintptr(header.ip6route.len)) <= len(c.data) &&
-		header.ip4.len%4 == 0 &&
-		header.ip6.len%16 == 0 &&
-		header.ip6route.len%8 == 0
+		uintptr(headerSize)+uintptr(header.IP4.Len+header.IP6.Len+header.IP6Route.Len) <= uintptr(maxInt) &&
+		len(c.data) >= int(headerSize)+int(header.IP4.Len+header.IP6.Len+header.IP6Route.Len) &&
+		(header.IP4.Len == 0 || uintptr(header.IP4.Base) >= headerSize) &&
+		(header.IP6.Len == 0 || uintptr(header.IP6.Base) >= headerSize) &&
+		(header.IP6Route.Len == 0 || uintptr(header.IP6Route.Base) >= headerSize) &&
+		uintptr(header.IP4.Base)+uintptr(header.IP4.Len) <= uintptr(maxInt) &&
+		uintptr(header.IP6.Base)+uintptr(header.IP6.Len) <= uintptr(maxInt) &&
+		uintptr(header.IP6Route.Base)+uintptr(header.IP6Route.Len) <= uintptr(maxInt) &&
+		int(uintptr(header.IP4.Base)+uintptr(header.IP4.Len)) <= len(c.data) &&
+		int(uintptr(header.IP6.Base)+uintptr(header.IP6.Len)) <= len(c.data) &&
+		int(uintptr(header.IP6Route.Base)+uintptr(header.IP6Route.Len)) <= len(c.data) &&
+		header.IP4.Len%4 == 0 &&
+		header.IP6.Len%16 == 0 &&
+		header.IP6Route.Len%8 == 0
 }
 
 // Contains returns a boolean indicating whether the
@@ -205,7 +205,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 
 	lock.RLock()
 
-	if c.revision != uint32(header.revision) {
+	if c.revision != uint32(header.Revision) {
 		/* RUnlock is called inside of remap iff an error is returned */
 		if err := c.remap(false); err != nil {
 			return false, err
@@ -220,32 +220,32 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 	if ip4 := ip.To4(); ip4 != nil {
 		ip = ip4
 
-		if header.ip4.len == 0 {
+		if header.IP4.Len == 0 {
 			return false, nil
 		}
 
 		searcher := newBinarySearcher(net.IPv4len, nil)
-		searcher.Data = c.data[header.ip4.base : int(header.ip4.base)+int(header.ip4.len)]
+		searcher.Data = c.data[header.IP4.Base : int(header.IP4.Base)+int(header.IP4.Len)]
 
 		return searcher.Contains(ip), nil
 	} else if ip6 := ip.To16(); ip6 != nil {
 		ip = ip6
 
-		if header.ip6route.len != 0 {
+		if header.IP6Route.Len != 0 {
 			searcher := newBinarySearcher(net.IPv6len/2, nil)
-			searcher.Data = c.data[header.ip6route.base : int(header.ip6route.base)+int(header.ip6route.len)]
+			searcher.Data = c.data[header.IP6Route.Base : int(header.IP6Route.Base)+int(header.IP6Route.Len)]
 
 			if searcher.Contains(ip[:net.IPv6len/2]) {
 				return true, nil
 			}
 		}
 
-		if header.ip6.len == 0 {
+		if header.IP6.Len == 0 {
 			return false, nil
 		}
 
 		searcher := newBinarySearcher(net.IPv6len, nil)
-		searcher.Data = c.data[header.ip6.base : int(header.ip6.base)+int(header.ip6.len)]
+		searcher.Data = c.data[header.IP6.Base : int(header.IP6.Base)+int(header.IP6.Len)]
 
 		return searcher.Contains(ip), nil
 	} else {
@@ -301,8 +301,8 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 
 	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
 
-	ip4 = int(header.ip4.len / net.IPv4len)
-	ip6 = int(header.ip6.len / net.IPv6len)
-	ip6routes = int(header.ip6route.len / (net.IPv6len / 2))
+	ip4 = int(header.IP4.Len / net.IPv4len)
+	ip6 = int(header.IP6.Len / net.IPv6len)
+	ip6routes = int(header.IP6Route.Len / (net.IPv6len / 2))
 	return
 }
