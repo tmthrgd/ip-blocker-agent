@@ -131,7 +131,7 @@ func subBytes64(x, y []byte) int {
 var subBytes func(x, y []byte) int
 
 func init() {
-	if int(^uint(0)>>1) == int(int32(^uint32(0)>>1)) {
+	if ^uint(0) == uint(^uint32(0)) {
 		subBytes = subBytes32
 	} else {
 		subBytes = subBytes64
