@@ -1336,7 +1336,7 @@ func TestOpenNonExist(t *testing.T) {
 	}
 }
 
-func TestOpenEmptyName(t *testing.T) {
+func TestNewOpenEmptyName(t *testing.T) {
 	t.Parallel()
 
 	client, err := Open("")
@@ -1346,6 +1346,16 @@ func TestOpenEmptyName(t *testing.T) {
 
 	if err != syscall.EINVAL {
 		t.Error("Open did not return EINVAL for empty name")
+	}
+
+	server, err := New("", 0)
+	if err == nil {
+		server.Close()
+		server.Unlink()
+	}
+
+	if err != syscall.EINVAL {
+		t.Error("New did not return EINVAL for empty name")
 	}
 }
 
