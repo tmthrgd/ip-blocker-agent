@@ -28,9 +28,15 @@ func subBytes32(x, y []byte) int {
 	var size int
 
 	switch {
-	case l >= 4:
+	case l >= 8:
 		size = 4
-	case l >= 2:
+	case l > 4:
+		panic("invalid length")
+	case l == 4:
+		size = 4
+	case l == 3:
+		panic("invalid length")
+	case l == 2:
 		size = 2
 	case l == 1:
 		size = 1
@@ -84,11 +90,17 @@ func subBytes64(x, y []byte) int {
 		panic("different lengths")
 	}
 
-	l := len(x) - 8
+	l := len(x)
 
-	if l < 0 {
+	switch {
+	case l >= 8:
+	case l > 4:
+		panic("invalid length")
+	default:
 		return subBytes32(x, y)
 	}
+
+	l -= 8
 
 	for i := 0; i < l; i++ {
 		if x[i] != y[i] {
