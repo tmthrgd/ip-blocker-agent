@@ -86,7 +86,12 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	}
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
-	header.Version = 1
+
+	if ^uint(0) == uint(^uint32(0)) {
+		header.Version = 2
+	} else {
+		header.Version = 1
+	}
 
 	lock := header.rwLocker()
 	lock.Create()

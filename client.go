@@ -53,7 +53,11 @@ func Open(name string) (*Client, error) {
 	}
 
 	header := (*shmHeader)(unsafe.Pointer(&data[0]))
-	if header.Version != 1 {
+
+	switch {
+	case ^uint(0) == uint(^uint32(0)) && header.Version == 2:
+	case ^uint(0) != uint(^uint32(0)) && header.Version == 1:
+	default:
 		file.Close()
 		return nil, ErrInvalidSharedMemory
 	}
