@@ -224,7 +224,9 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		searcher := newBinarySearcher(net.IPv4len, nil)
-		searcher.Data = c.data[header.IP4.Base : int(header.IP4.Base)+int(header.IP4.Len)]
+
+		end := int(header.IP4.Base) + int(header.IP4.Len)
+		searcher.Data = c.data[header.IP4.Base:end:end]
 
 		return searcher.Contains(ip), nil
 	} else if ip6 := ip.To16(); ip6 != nil {
@@ -232,7 +234,9 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 
 		if header.IP6Route.Len != 0 {
 			searcher := newBinarySearcher(net.IPv6len/2, nil)
-			searcher.Data = c.data[header.IP6Route.Base : int(header.IP6Route.Base)+int(header.IP6Route.Len)]
+
+			end := int(header.IP6Route.Base) + int(header.IP6Route.Len)
+			searcher.Data = c.data[header.IP6Route.Base:end:end]
 
 			if searcher.Contains(ip[:net.IPv6len/2]) {
 				return true, nil
@@ -244,7 +248,9 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		searcher := newBinarySearcher(net.IPv6len, nil)
-		searcher.Data = c.data[header.IP6.Base : int(header.IP6.Base)+int(header.IP6.Len)]
+
+		end := int(header.IP6.Base) + int(header.IP6.Len)
+		searcher.Data = c.data[header.IP6.Base:end:end]
 
 		return searcher.Contains(ip), nil
 	} else {
