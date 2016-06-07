@@ -456,9 +456,9 @@ func (s *Server) Unlink() error {
 // server is currently batching operations.
 func (s *Server) IsBatching() bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	return !s.closed && s.batching
+	isBatching := !s.closed && s.batching
+	s.mu.Unlock()
+	return isBatching
 }
 
 // Name returns the name of the shared memory.
