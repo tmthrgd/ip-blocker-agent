@@ -300,23 +300,16 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 
 	base := ip[:ips.Size()]
 	ones, _ := ipnet.Mask.Size()
-	left := len(base)*8 - ones
+	ones = len(base)*8 - ones
 
-	for left >= 0 {
-		var num int
-		if left > 30 {
-			num = 1 << 30
-			left -= 30
-		} else {
-			num = 1 << uint(left)
-			left = -1
-		}
+	if (^uint(0) == uint(^uint32(0)) && ones > 30) || (^uint(0) != uint(^uint32(0)) && ones > 62) {
+		return errRangeTooLarge
+	}
 
-		if insert {
-			base = ips.insertRange(base, num)
-		} else {
-			base = ips.removeRange(base, num)
-		}
+	if insert {
+		ips.insertRange(base, 1<<uint(ones))
+	} else {
+		ips.removeRange(base, 1<<uint(ones))
 	}
 
 	if s.batching {

@@ -1836,6 +1836,57 @@ func TestClientRemapLockFailure(t *testing.T) {
 	}
 }
 
+func TestInsertRangeMassive(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	var mask string
+	var expect int
+
+	switch os.Getenv("INSERTMASSIVERANGETEST") {
+	case "1":
+		mask = "/2"
+		expect = 1073741824
+	case "2":
+		mask = "/1"
+		expect = 2147483648
+
+		if ^uint(0) == uint(^uint32(0)) {
+			t.Skip("INSERTMASSIVERANGETEST=2 cannot be run on 32-bit systems")
+		}
+	default:
+		t.Skip("INSERTMASSIVERANGETEST is not set to 1 or 2")
+	}
+
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	ip, ipnet, err := net.ParseCIDR("192.0.2.0" + mask)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = server.InsertRange(ip, ipnet); err != nil {
+		t.Error(err)
+	}
+
+	if c := len(server.ip4s.Data) / net.IPv4len; c != expect {
+		t.Errorf("InsertRange(192.0.2.0%s) failed, expected count of %d ip4 address, got %d", mask, expect, c)
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 

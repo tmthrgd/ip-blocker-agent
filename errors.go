@@ -26,6 +26,8 @@ var (
 	// functions if the backing shared memory is invalid at
 	// the time of the call.
 	ErrInvalidSharedMemory = errors.New("invalid shared memory")
+
+	errRangeTooLarge = errors.New("range too large")
 )
 
 // LockReleaseFailedError records that a lock could not
