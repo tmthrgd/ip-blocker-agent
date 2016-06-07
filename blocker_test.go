@@ -1580,7 +1580,7 @@ func TestInvalidVersion(t *testing.T) {
 	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
 
 	vx := version
-	if version & 0x80000000 == 0 {
+	if version&0x80000000 == 0 {
 		vx |= 0x80000000
 	} else {
 		vx &^= 0x80000000
@@ -1611,7 +1611,7 @@ func TestMemoryTooShort(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
-	if err = server.file.Truncate(headerSize-1); err != nil {
+	if err = server.file.Truncate(headerSize - 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1644,7 +1644,7 @@ func TestInvalidHeader(t *testing.T) {
 	orig := *header
 
 	const maxInt = int(^uint(0) >> 1)
-	for i, fn := range [...]func(*shmHeader) {
+	for i, fn := range [...]func(*shmHeader){
 		func(h *shmHeader) { h.IP4.Base, h.IP4.Len = 0, 32 },
 		func(h *shmHeader) { h.IP6.Base, h.IP6.Len = 0, 32 },
 		func(h *shmHeader) { h.IP6Route.Base, h.IP6Route.Len = 0, 32 },
@@ -1654,13 +1654,27 @@ func TestInvalidHeader(t *testing.T) {
 		func(h *shmHeader) { h.IP4.Len = 7 },
 		func(h *shmHeader) { h.IP6.Len = 31 },
 		func(h *shmHeader) { h.IP6Route.Len = 15 },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), maxInt, int(h.IP6.Base), maxInt, int(h.IP6Route.Base), maxInt) },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), maxInt, int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), int(h.IP6Route.Len)) },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), maxInt, int(h.IP6Route.Base), int(h.IP6Route.Len)) },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), maxInt) },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), 0xfffff, int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), int(h.IP6Route.Len)) },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), 0xfffff, int(h.IP6Route.Base), int(h.IP6Route.Len)) },
-		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), 0xfffff) },
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), maxInt, int(h.IP6.Base), maxInt, int(h.IP6Route.Base), maxInt)
+		},
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), maxInt, int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), int(h.IP6Route.Len))
+		},
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), maxInt, int(h.IP6Route.Base), int(h.IP6Route.Len))
+		},
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), maxInt)
+		},
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), 0xfffff, int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), int(h.IP6Route.Len))
+		},
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), 0xfffff, int(h.IP6Route.Base), int(h.IP6Route.Len))
+		},
+		func(h *shmHeader) {
+			h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), 0xfffff)
+		},
 	} {
 		fn(header)
 
@@ -1716,7 +1730,7 @@ func testChangeBeforeLock(t *testing.T, corrupter func(*shmHeader)) {
 		}
 	}()
 
-	time.Sleep(50*time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if err = server.file.Truncate(int64(len(server.data)) + 1); err != nil {
 		t.Fatal(err)
@@ -1813,7 +1827,7 @@ func TestClientRemapLockFailure(t *testing.T) {
 	defer server.Close()
 	defer client.Close()
 
-	if err = server.file.Truncate(headerSize-1); err != nil {
+	if err = server.file.Truncate(headerSize - 1); err != nil {
 		t.Fatal(err)
 	}
 
