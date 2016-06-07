@@ -42,7 +42,11 @@ func calculateOffsets(base, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos
 // 	object  with  the same name will fail (unless O_CREAT was specified, in
 // 	which case a new, distinct object is created).
 func Unlink(name string) error {
-	return shmUnlink(name)
+	if err := shmUnlink(name); err != nil {
+		return &os.PathError{Op: "unlink", Path: name, Err: err}
+	}
+
+	return nil
 }
 
 // Server is an IP blocker shared memory server.
@@ -72,7 +76,7 @@ type Server struct {
 func New(name string, perm os.FileMode) (*Server, error) {
 	file, err := shmOpen(name, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, perm)
 	if err != nil {
-		return nil, err
+		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 
 	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(int(headerSize), 0, 0, 0)
@@ -450,14 +454,14 @@ func (s *Server) Unlink() error {
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return shmUnlink(s.file.Name())
+		return Unlink(s.file.Name())
 	}
 
 	if err := s.close(); err != nil {
 		return err
 	}
 
-	return shmUnlink(s.file.Name())
+	return Unlink(s.file.Name())
 }
 
 // IsBatching returns a boolean indicating whether the

@@ -17,7 +17,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 	"unsafe"
@@ -1321,8 +1320,8 @@ func TestNewOpenEmptyName(t *testing.T) {
 		client.Close()
 	}
 
-	if err != syscall.EINVAL {
-		t.Error("Open did not return EINVAL for empty name")
+	if _, ok := err.(*os.PathError); !ok {
+		t.Error("Open did not return *os.PathError for empty name")
 	}
 
 	server, err := New("", 0)
@@ -1331,16 +1330,16 @@ func TestNewOpenEmptyName(t *testing.T) {
 		server.Unlink()
 	}
 
-	if err != syscall.EINVAL {
-		t.Error("New did not return EINVAL for empty name")
+	if _, ok := err.(*os.PathError); !ok {
+		t.Error("New did not return *os.PathError for empty name")
 	}
 }
 
 func TestUnlinkEmptyName(t *testing.T) {
 	t.Parallel()
 
-	if err := Unlink(""); err == nil {
-		t.Errorf("Unlink did not return error for empty name")
+	if _, ok := Unlink("").(*os.PathError); !ok {
+		t.Errorf("Unlink did not return *os.PathError for empty name")
 	}
 }
 
