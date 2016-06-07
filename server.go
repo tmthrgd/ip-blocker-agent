@@ -295,12 +295,7 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 
 	if s.doInsertRemoveRangeHook != nil {
 		s.doInsertRemoveRangeHook(insert, ip, ipnet, ips)
-
-		if s.batching {
-			return nil
-		}
-
-		return s.commit()
+		return nil
 	}
 
 	base := ip[:ips.Size()]
