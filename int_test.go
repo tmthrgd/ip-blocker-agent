@@ -175,6 +175,30 @@ func TestSubtractionDifferentLengths(t *testing.T) {
 	testSubtractionDifferentLengths(t, subBytes64)
 }
 
+func testSubtractionInvalidLength(t *testing.T, l int, sub func(x, y []byte) int) {
+	x := make([]byte, l)
+
+	defer func() {
+		if err := recover(); err != nil && err != "invalid length" {
+			panic(err)
+		}
+	}()
+
+	sub(x, x)
+	t.Error("did not panic on invalid length")
+}
+
+func TestSubtractionInvalidLength(t *testing.T) {
+	testSubtractionInvalidLength(t, 3, subBytes32)
+	testSubtractionInvalidLength(t, 3, subBytes64)
+	testSubtractionInvalidLength(t, 5, subBytes32)
+	testSubtractionInvalidLength(t, 5, subBytes64)
+	testSubtractionInvalidLength(t, 6, subBytes32)
+	testSubtractionInvalidLength(t, 6, subBytes64)
+	testSubtractionInvalidLength(t, 7, subBytes32)
+	testSubtractionInvalidLength(t, 7, subBytes64)
+}
+
 func benchmarkManualIncrement(b *testing.B, size int) {
 	ip := make([]byte, size)
 
