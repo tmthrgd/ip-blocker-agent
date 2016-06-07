@@ -10,8 +10,9 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const cachelineSize = 64
@@ -85,7 +86,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err := unix.Mmap(int(file.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 func (s *Server) commit() error {
 	s.batching = false
 
-	if err := syscall.Munmap(s.data); err != nil {
+	if err := unix.Munmap(s.data); err != nil {
 		return err
 	}
 
@@ -133,7 +134,7 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	data, err := syscall.Mmap(int(s.file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err := unix.Mmap(int(s.file.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return err
 	}
@@ -170,11 +171,11 @@ func (s *Server) commit() error {
 
 	lock.Unlock()
 
-	if err := syscall.Munmap(data); err != nil {
+	if err := unix.Munmap(data); err != nil {
 		return err
 	}
 
-	data, err = syscall.Mmap(int(s.file.Fd()), 0, int(size2), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err = unix.Mmap(int(s.file.Fd()), 0, int(size2), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return err
 	}
@@ -404,7 +405,7 @@ func (s *Server) Batch() error {
 func (s *Server) close() error {
 	s.closed = true
 
-	if err := syscall.Munmap(s.data); err != nil {
+	if err := unix.Munmap(s.data); err != nil {
 		return err
 	}
 

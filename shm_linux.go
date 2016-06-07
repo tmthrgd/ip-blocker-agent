@@ -7,7 +7,8 @@ package blocker
 
 import (
 	"os"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 const devShm = "/dev/shm/"
@@ -20,21 +21,21 @@ func shmOpen(name string, flag int, perm os.FileMode) (*os.File, error) {
 	}
 
 	if len(name) == 0 {
-		return nil, syscall.EINVAL
+		return nil, unix.EINVAL
 	}
 
 	o := uint32(perm.Perm())
 	if perm&os.ModeSetuid != 0 {
-		o |= syscall.S_ISUID
+		o |= unix.S_ISUID
 	}
 	if perm&os.ModeSetgid != 0 {
-		o |= syscall.S_ISGID
+		o |= unix.S_ISGID
 	}
 	if perm&os.ModeSticky != 0 {
-		o |= syscall.S_ISVTX
+		o |= unix.S_ISVTX
 	}
 
-	fd, err := syscall.Open(devShm+name, flag|syscall.O_CLOEXEC, o)
+	fd, err := unix.Open(devShm+name, flag|unix.O_CLOEXEC, o)
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +49,8 @@ func shmUnlink(name string) error {
 	}
 
 	if len(name) == 0 {
-		return syscall.EINVAL
+		return unix.EINVAL
 	}
 
-	return syscall.Unlink(devShm + name)
+	return unix.Unlink(devShm + name)
 }

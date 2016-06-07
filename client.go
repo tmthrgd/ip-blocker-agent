@@ -10,8 +10,9 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // Client is an IP blocker shared memory client.
@@ -47,7 +48,7 @@ func Open(name string) (*Client, error) {
 		return nil, ErrInvalidSharedMemory
 	}
 
-	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	data, err := unix.Mmap(int(file.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		file.Close()
 		return nil, err
@@ -75,7 +76,7 @@ func Open(name string) (*Client, error) {
 	if err != nil {
 		lock.RUnlock()
 
-		syscall.Munmap(data)
+		unix.Munmap(data)
 		file.Close()
 		return nil, err
 	}
@@ -94,7 +95,7 @@ func Open(name string) (*Client, error) {
 	} else if !client.checkSharedMemory() {
 		lock.RUnlock()
 
-		syscall.Munmap(data)
+		unix.Munmap(data)
 		file.Close()
 		return nil, ErrInvalidSharedMemory
 	}
@@ -133,7 +134,7 @@ func (c *Client) remap(force bool) (err error) {
 		goto err
 	}
 
-	c.data, err = syscall.Mmap(int(c.file.Fd()), 0, int(stat.Size()), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	c.data, err = unix.Mmap(int(c.file.Fd()), 0, int(stat.Size()), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		goto err
 	}
@@ -145,7 +146,7 @@ func (c *Client) remap(force bool) (err error) {
 
 	c.revision = uint32((*shmHeader)(unsafe.Pointer(&c.data[0])).Revision)
 
-	err = syscall.Munmap(data)
+	err = unix.Munmap(data)
 	return
 
 err:
@@ -156,7 +157,7 @@ err:
 		err = LockReleaseFailedError{err}
 	}
 
-	syscall.Munmap(data)
+	unix.Munmap(data)
 	return
 }
 
@@ -271,7 +272,7 @@ func (c *Client) Close() error {
 	c.closed = true
 
 	if c.data != nil {
-		if err := syscall.Munmap(c.data); err != nil {
+		if err := unix.Munmap(c.data); err != nil {
 			return err
 		}
 
