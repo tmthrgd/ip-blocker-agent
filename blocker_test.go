@@ -1801,6 +1801,27 @@ func TestClientRemapAlreadyDone(t *testing.T) {
 	}
 }
 
+func TestClientRemapLockFailure(t *testing.T) {
+	t.Parallel()
+
+	server, client, err := setup(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	if err = server.file.Truncate(headerSize-1); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := client.remap(true).(LockReleaseFailedError); !ok {
+		t.Error("remap managed to release invalid lock")
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
