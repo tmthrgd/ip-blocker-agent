@@ -24,12 +24,12 @@ func shmOpen(name string, flag int, perm os.FileMode) (*os.File, error) {
 	nameC := C.CString(name)
 	defer C.free(unsafe.Pointer(nameC))
 
-	fd, err := C.shm_open(nameC, C.int(flag), C.mode_t(perms))
+	fd, err := C.shm_open(nameC, C.int(flag), C.mode_t(perm))
 	if err != nil {
 		return nil, err
 	}
 
-	return os.NewFile(uintptr(fd), name), file
+	return os.NewFile(uintptr(fd), name), nil
 }
 
 func shmUnlink(name string) error {

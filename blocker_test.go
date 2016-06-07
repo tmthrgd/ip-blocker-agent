@@ -1339,8 +1339,8 @@ func TestNewOpenEmptyName(t *testing.T) {
 func TestUnlinkEmptyName(t *testing.T) {
 	t.Parallel()
 
-	if err := Unlink(""); err != syscall.EINVAL {
-		t.Error("Unlink did not return EINVAL for empty name")
+	if err := Unlink(""); err == nil {
+		t.Errorf("Unlink did not return error for empty name")
 	}
 }
 
