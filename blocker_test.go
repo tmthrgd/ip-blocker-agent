@@ -17,6 +17,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unsafe"
@@ -1562,6 +1563,241 @@ func TestInvalidAddr(t *testing.T) {
 	_, err = client.Contains(invl2[:])
 	if _, ok := err.(*net.AddrError); !ok {
 		t.Error("(*Client).Contains did not return a net.AddrError with invalid address")
+	}
+}
+
+func TestInvalidVersion(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+
+	vx := version
+	if version & 0x80000000 == 0 {
+		vx |= 0x80000000
+	} else {
+		vx &^= 0x80000000
+	}
+
+	for _, v := range [...]uint32{0xa5a5a5a5, 0, vx} {
+		atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), v)
+
+		client, err := Open(server.Name())
+		if err != ErrInvalidSharedMemory {
+			if err == nil {
+				client.Close()
+			}
+
+			t.Error("Open did not return ErrInvalidSharedMemory for invalid version")
+		}
+	}
+}
+
+func TestMemoryTooShort(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.file.Truncate(headerSize-1); err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := Open(server.Name())
+	if err != ErrInvalidSharedMemory {
+		if err == nil {
+			client.Close()
+		}
+
+		t.Error("Open did not return ErrInvalidSharedMemory for too short memory")
+	}
+}
+
+func TestInvalidHeader(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.file.Truncate(0xfffff); err != nil {
+		t.Fatal(err)
+	}
+
+	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	orig := *header
+
+	const maxInt = int(^uint(0) >> 1)
+	for i, fn := range [...]func(*shmHeader) {
+		func(h *shmHeader) { h.IP4.Base, h.IP4.Len = 0, 32 },
+		func(h *shmHeader) { h.IP6.Base, h.IP6.Len = 0, 32 },
+		func(h *shmHeader) { h.IP6Route.Base, h.IP6Route.Len = 0, 32 },
+		func(h *shmHeader) { h.IP4.Base, h.IP4.Len = 0xfffff, 4<<10 },
+		func(h *shmHeader) { h.IP6.Base, h.IP6.Len = 0xfffff, 16<<10 },
+		func(h *shmHeader) { h.IP6Route.Base, h.IP6Route.Len = 0xfffff, 8<<10 },
+		func(h *shmHeader) { h.IP4.Len = 7 },
+		func(h *shmHeader) { h.IP6.Len = 31 },
+		func(h *shmHeader) { h.IP6Route.Len = 15 },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), maxInt, int(h.IP6.Base), maxInt, int(h.IP6Route.Base), maxInt) },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), maxInt, int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), int(h.IP6Route.Len)) },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), maxInt, int(h.IP6Route.Base), int(h.IP6Route.Len)) },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), maxInt) },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), 0xfffff, int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), int(h.IP6Route.Len)) },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), 0xfffff, int(h.IP6Route.Base), int(h.IP6Route.Len)) },
+		func(h *shmHeader) { h.setBlocks(int(h.IP4.Base), int(h.IP4.Len), int(h.IP6.Base), int(h.IP6.Len), int(h.IP6Route.Base), 0xfffff) },
+	} {
+		fn(header)
+
+		client, err := Open(server.Name())
+		if err != ErrInvalidSharedMemory {
+			if err == nil {
+				client.Close()
+			}
+
+			t.Errorf("Open did not return ErrInvalidSharedMemory for invalid header (%d)", i)
+		}
+
+		lock := header.Lock
+		*header = orig
+		header.Lock = lock
+	}
+}
+
+func testChangeBeforeLock(t *testing.T, corrupter func(*shmHeader)) {
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	lock := header.rwLocker()
+	lock.Lock()
+
+	done := make(chan struct{}, 1)
+	go func() {
+		defer func() {
+			done <- struct{}{}
+		}()
+
+		client, err := Open(server.Name())
+		if corrupter != nil {
+			if err != ErrInvalidSharedMemory {
+				if err == nil {
+					client.Close()
+				}
+
+				t.Error("Open did not return ErrInvalidSharedMemory for invalid header")
+			}
+		} else {
+			if err != nil {
+				t.Error(err)
+			} else {
+				client.Close()
+			}
+		}
+	}()
+
+	time.Sleep(50*time.Millisecond)
+
+	if err = server.file.Truncate(int64(len(server.data)) + 1); err != nil {
+		t.Fatal(err)
+	}
+
+	if corrupter != nil {
+		corrupter(header)
+	}
+
+	lock.Unlock()
+	<-done
+}
+
+func TestChangeBeforeLock(t *testing.T) {
+	t.Parallel()
+
+	testChangeBeforeLock(t, nil)
+}
+
+func TestCorruptChangeBeforeLock(t *testing.T) {
+	t.Parallel()
+
+	testChangeBeforeLock(t, func(h *shmHeader) {
+		h.IP4.Base, h.IP4.Len = 0, 32
+	})
+}
+
+func TestCorruptContains(t *testing.T) {
+	t.Parallel()
+
+	server, client, err := setup(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+
+	lock := header.rwLocker()
+	lock.Lock()
+
+	header.IP6.Base, header.IP6.Len = 0, 32
+	header.Revision++
+
+	lock.Unlock()
+
+	if _, err := client.Contains(net.IPv4zero); err != ErrInvalidSharedMemory {
+		t.Error("Contains did not return ErrInvalidSharedMemory for corrupt header")
+	}
+}
+
+func TestClientRemapAlreadyDone(t *testing.T) {
+	t.Parallel()
+
+	server, client, err := setup(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+	defer client.Close()
+
+	client.mu.RLock()
+	client.mu.RLock()
+
+	go func() {
+		defer client.mu.RUnlock()
+
+		if err := client.remap(true); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	defer client.mu.RUnlock()
+
+	if err := client.remap(false); err != nil {
+		t.Error(err)
 	}
 }
 
