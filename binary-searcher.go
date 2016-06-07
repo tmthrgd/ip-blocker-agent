@@ -119,10 +119,9 @@ func (s *binarySearcher) insertRange(base []byte, num int) []byte {
 		panic("invalid size")
 	}
 
-	buf := bufPool.Get().(*bytes.Buffer)
-	defer bufPool.Put(buf)
-
 	x := base
+
+	buf := bufPool.Get().(*bytes.Buffer)
 
 	for num > 0 {
 		pos, has := s.search(x)
@@ -180,6 +179,7 @@ func (s *binarySearcher) insertRange(base []byte, num int) []byte {
 		}
 	}
 
+	bufPool.Put(buf)
 	return x
 }
 
