@@ -49,9 +49,9 @@ func Unlink(name string) error {
 type Server struct {
 	file *os.File
 
-	ip4s  *binarySearcher
-	ip6s  *binarySearcher
-	ip6rs *binarySearcher
+	ip4s  binarySearcher
+	ip6s  binarySearcher
+	ip6rs binarySearcher
 
 	data []byte
 	end  int
@@ -100,9 +100,9 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	return &Server{
 		file: file,
 
-		ip4s:  newBinarySearcher(net.IPv4len, nil),
-		ip6s:  newBinarySearcher(net.IPv6len, nil),
-		ip6rs: newBinarySearcher(net.IPv6len/2, nil),
+		ip4s:  binarySearcher{size: net.IPv4len, compare: defaultCompare},
+		ip6s:  binarySearcher{size: net.IPv6len, compare: defaultCompare},
+		ip6rs: binarySearcher{size: net.IPv6len / 2, compare: defaultCompare},
 
 		data: data,
 		end:  end,
@@ -276,14 +276,14 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 
 	if ip4 := masked.To4(); ip4 != nil {
 		ip = ip4
-		ips = s.ip4s
+		ips = &s.ip4s
 	} else if ip6 := masked.To16(); ip6 != nil {
 		ip = ip6
 
 		if ones, _ := ipnet.Mask.Size(); ones <= s.ip6rs.Size()*8 {
-			ips = s.ip6rs
+			ips = &s.ip6rs
 		} else {
-			ips = s.ip6s
+			ips = &s.ip6s
 		}
 	} else {
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}

@@ -11,6 +11,8 @@ import (
 	"sync"
 )
 
+var defaultCompare = bytes.Compare
+
 type binarySearcher struct {
 	Data []byte
 
@@ -23,7 +25,7 @@ type binarySearcher struct {
 
 func newBinarySearcher(size int, compare func(a, b []byte) int) *binarySearcher {
 	if compare == nil {
-		compare = bytes.Compare
+		compare = defaultCompare
 	}
 
 	return &binarySearcher{
