@@ -30,7 +30,7 @@ type shmHeader struct {
 }
 
 func (h *shmHeader) rwLocker() *rwLock {
-	return (*rwLock)(&h.Lock)
+	return &h.Lock
 }
 
 func (h *shmHeader) setBlocks(ip4, ip4len, ip6, ip6len, ip6r, ip6rlen int) {
