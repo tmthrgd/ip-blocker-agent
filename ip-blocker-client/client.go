@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	blocker "github.com/tmthrgd/ip-blocker-agent"
+	"github.com/tmthrgd/ip-blocker-agent"
 )
 
 func printClient(client *blocker.Client) {
