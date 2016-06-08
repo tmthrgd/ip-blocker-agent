@@ -55,14 +55,6 @@ func castToHeader(data *byte) *shmHeader {
 	return (*shmHeader)(unsafe.Pointer(data))
 }
 
-func (h *shmHeader) versionPointer() *uint32 {
-	return (*uint32)(unsafe.Pointer(&h.Version))
-}
-
-func (h *shmHeader) rwLocker() *rwLock {
-	return (*rwLock)(&h.Lock)
-}
-
 func (h *shmHeader) setBlocks(ip4, ip4len, ip6, ip6len, ip6r, ip6rlen int) {
 	h.IP4.Base = C.size_t(ip4)
 	h.IP4.Len = C.size_t(ip4len)

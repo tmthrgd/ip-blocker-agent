@@ -1264,41 +1264,6 @@ func TestAddLargeRange(t *testing.T) {
 	}
 }
 
-func TestServerRWLocker(t *testing.T) {
-	t.Parallel()
-
-	server, _, err := setup(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-
-	header := castToHeader(&server.data[0])
-	lock := header.rwLocker()
-	lock.Lock()
-	lock.Unlock()
-}
-
-func TestClientRWLocker(t *testing.T) {
-	t.Parallel()
-
-	server, client, err := setup(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-	defer client.Close()
-
-	header := castToHeader(&client.data[0])
-	lock := header.rwLocker()
-	lock.RLock()
-	lock.RUnlock()
-}
-
 func TestOpenNonExist(t *testing.T) {
 	t.Parallel()
 
@@ -1586,7 +1551,7 @@ func TestInvalidVersion(t *testing.T) {
 	}
 
 	for _, v := range [...]uint32{0xa5a5a5a5, 0, vx} {
-		atomic.StoreUint32(header.versionPointer(), v)
+		atomic.StoreUint32((*uint32)(&header.Version), v)
 
 		client, err := Open(server.Name())
 		if err != ErrInvalidSharedMemory {
@@ -1702,7 +1667,7 @@ func testChangeBeforeLock(t *testing.T, corrupter func(*shmHeader)) {
 	defer server.Close()
 
 	header := castToHeader(&server.data[0])
-	lock := header.rwLocker()
+	lock := (*rwLock)(&header.Lock)
 	lock.Lock()
 
 	done := make(chan struct{}, 1)
@@ -1771,7 +1736,7 @@ func TestCorruptContains(t *testing.T) {
 
 	header := castToHeader(&server.data[0])
 
-	lock := header.rwLocker()
+	lock := (*rwLock)(&header.Lock)
 	lock.Lock()
 
 	header.IP6.Base, header.IP6.Len = 0, 32
@@ -2217,7 +2182,8 @@ func BenchmarkClientRemap(b *testing.B) {
 	defer client.Close()
 
 	header := castToHeader(&client.data[0])
-	header.rwLocker().RLock()
+	lock := (*rwLock)(&header.Lock)
+	lock.RLock()
 
 	b.ResetTimer()
 
@@ -2230,7 +2196,8 @@ func BenchmarkClientRemap(b *testing.B) {
 	b.StopTimer()
 
 	header = castToHeader(&client.data[0])
-	header.rwLocker().RUnlock()
+	lock = (*rwLock)(&header.Lock)
+	lock.RUnlock()
 }
 
 func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int) {

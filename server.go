@@ -92,14 +92,14 @@ func New(name string, perm os.FileMode) (*Server, error) {
 
 	header := castToHeader(&data[0])
 
-	lock := header.rwLocker()
+	lock := (*rwLock)(&header.Lock)
 	lock.Create()
 
 	header.setBlocks(ip4BasePos, 0, ip6BasePos, 0, ip6rBasePos, 0)
 
 	header.Revision = 1
 
-	atomic.StoreUint32(header.versionPointer(), version)
+	atomic.StoreUint32((*uint32)(&header.Version), version)
 
 	return &Server{
 		file: file,
@@ -139,7 +139,7 @@ func (s *Server) commit() error {
 	}
 
 	header := castToHeader(&data[0])
-	lock := header.rwLocker()
+	lock := (*rwLock)(&header.Lock)
 
 	copy(data[ip4BasePos:ip4BasePos+len(s.ip4s.Data):ip6BasePos], s.ip4s.Data)
 	copy(data[ip6BasePos:ip6BasePos+len(s.ip6s.Data):ip6rBasePos], s.ip6s.Data)

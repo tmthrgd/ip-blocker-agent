@@ -55,7 +55,7 @@ func Open(name string) (*Client, error) {
 
 	header := castToHeader(&data[0])
 
-	if atomic.LoadUint32(header.versionPointer()) != version {
+	if atomic.LoadUint32((*uint32)(&header.Version)) != version {
 		file.Close()
 		return nil, ErrInvalidSharedMemory
 	}
@@ -66,7 +66,7 @@ func Open(name string) (*Client, error) {
 		data: data,
 	}
 
-	lock := header.rwLocker()
+	lock := (*rwLock)(&header.Lock)
 	lock.RLock()
 
 	client.revision = uint32(header.Revision)
@@ -90,7 +90,7 @@ func Open(name string) (*Client, error) {
 		}
 
 		header = castToHeader(&client.data[0])
-		lock = header.rwLocker()
+		lock = (*rwLock)(&header.Lock)
 	} else if !client.checkSharedMemory() {
 		lock.RUnlock()
 
@@ -151,7 +151,8 @@ func (c *Client) remap(force bool) (err error) {
 err:
 	if len(c.data) == 0 || len(c.data) >= int(headerSize) {
 		header := castToHeader(&data[0])
-		header.rwLocker().RUnlock()
+		lock := (*rwLock)(&header.Lock)
+		lock.RUnlock()
 	} else {
 		err = LockReleaseFailedError{err}
 	}
@@ -200,7 +201,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 	}
 
 	header := castToHeader(&c.data[0])
-	lock := header.rwLocker()
+	lock := (*rwLock)(&header.Lock)
 
 	lock.RLock()
 
@@ -211,7 +212,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		header = castToHeader(&c.data[0])
-		lock = header.rwLocker()
+		lock = (*rwLock)(&header.Lock)
 	}
 
 	defer lock.RUnlock()
