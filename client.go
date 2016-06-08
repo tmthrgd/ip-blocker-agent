@@ -307,8 +307,13 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 
 	header := castToHeader(&c.data[0])
 
+	lock := (*rwLock)(&header.Lock)
+	lock.RLock()
+
 	ip4 = int(header.IP4.Len / net.IPv4len)
 	ip6 = int(header.IP6.Len / net.IPv6len)
 	ip6routes = int(header.IP6Route.Len / (net.IPv6len / 2))
+
+	lock.RUnlock()
 	return
 }
