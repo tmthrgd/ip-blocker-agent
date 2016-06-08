@@ -10,7 +10,6 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -91,7 +90,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&data[0]))
+	header := castToHeader(&data[0])
 
 	lock := header.rwLocker()
 	lock.Create()
@@ -100,7 +99,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 
 	header.Revision = 1
 
-	atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), version)
+	atomic.StoreUint32(header.versionPointer(), version)
 
 	return &Server{
 		file: file,
@@ -139,7 +138,7 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&data[0]))
+	header := castToHeader(&data[0])
 	lock := header.rwLocker()
 
 	copy(data[ip4BasePos:ip4BasePos+len(s.ip4s.Data):ip6BasePos], s.ip4s.Data)
@@ -483,7 +482,7 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&s.data[0]))
+	header := castToHeader(&s.data[0])
 
 	ip4 = int(header.IP4.Len / net.IPv4len)
 	ip6 = int(header.IP6.Len / net.IPv6len)

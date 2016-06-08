@@ -5,7 +5,7 @@
 
 // +build linux
 
-//go:generate sh -c "GOARCH=386 go tool cgo -godefs blocker.go | gofmt -r '(*rwLock)(x)->x' > blocker_linux_386.go"
-//go:generate sh -c "GOARCH=amd64 go tool cgo -godefs blocker.go | gofmt -r '(*rwLock)(x)->x' > blocker_linux_amd64.go"
+//go:generate sh -c "GOARCH=386 go tool cgo -godefs blocker.go | gofmt -r '(*rwLock)(x)->x' | gofmt -r '(*uint32)(unsafe.Pointer(x))->x' > blocker_linux_386.go"
+//go:generate sh -c "GOARCH=amd64 go tool cgo -godefs blocker.go | gofmt -r '(*rwLock)(x)->x' | gofmt -r '(*uint32)(unsafe.Pointer(x))->x' > blocker_linux_amd64.go"
 
 package blocker

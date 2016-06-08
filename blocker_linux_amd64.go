@@ -3,6 +3,8 @@
 
 package blocker
 
+import "unsafe"
+
 type mutex struct {
 	Sem [32]byte
 }
@@ -27,6 +29,14 @@ type shmHeader struct {
 	IP4      ipBlock
 	IP6      ipBlock
 	IP6Route ipBlock
+}
+
+func castToHeader(data *byte) *shmHeader {
+	return (*shmHeader)(unsafe.Pointer(data))
+}
+
+func (h *shmHeader) versionPointer() *uint32 {
+	return &h.Version
 }
 
 func (h *shmHeader) rwLocker() *rwLock {

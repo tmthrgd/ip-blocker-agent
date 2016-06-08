@@ -10,7 +10,6 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -54,9 +53,9 @@ func Open(name string) (*Client, error) {
 		return nil, err
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&data[0]))
+	header := castToHeader(&data[0])
 
-	if atomic.LoadUint32((*uint32)(unsafe.Pointer(&header.Version))) != version {
+	if atomic.LoadUint32(header.versionPointer()) != version {
 		file.Close()
 		return nil, ErrInvalidSharedMemory
 	}
@@ -90,7 +89,7 @@ func Open(name string) (*Client, error) {
 			return nil, err
 		}
 
-		header = (*shmHeader)(unsafe.Pointer(&client.data[0]))
+		header = castToHeader(&client.data[0])
 		lock = header.rwLocker()
 	} else if !client.checkSharedMemory() {
 		lock.RUnlock()
@@ -120,7 +119,7 @@ func (c *Client) remap(force bool) (err error) {
 			return ErrClosed
 		}
 
-		header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
+		header := castToHeader(&c.data[0])
 		if c.revision == uint32(header.Revision) {
 			return nil
 		}
@@ -144,14 +143,14 @@ func (c *Client) remap(force bool) (err error) {
 		goto err
 	}
 
-	c.revision = uint32((*shmHeader)(unsafe.Pointer(&c.data[0])).Revision)
+	c.revision = uint32(castToHeader(&c.data[0]).Revision)
 
 	err = unix.Munmap(data)
 	return
 
 err:
 	if len(c.data) == 0 || len(c.data) >= int(headerSize) {
-		header := (*shmHeader)(unsafe.Pointer(&data[0]))
+		header := castToHeader(&data[0])
 		header.rwLocker().RUnlock()
 	} else {
 		err = LockReleaseFailedError{err}
@@ -166,7 +165,7 @@ func (c *Client) checkSharedMemory() bool {
 		panic(ErrClosed)
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
+	header := castToHeader(&c.data[0])
 
 	const maxInt = int(^uint(0) >> 1)
 	return len(c.data) >= int(headerSize) &&
@@ -200,7 +199,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		return false, ErrInvalidSharedMemory
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
+	header := castToHeader(&c.data[0])
 	lock := header.rwLocker()
 
 	lock.RLock()
@@ -211,7 +210,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 			return false, err
 		}
 
-		header = (*shmHeader)(unsafe.Pointer(&c.data[0]))
+		header = castToHeader(&c.data[0])
 		lock = header.rwLocker()
 	}
 
@@ -305,7 +304,7 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&c.data[0]))
+	header := castToHeader(&c.data[0])
 
 	ip4 = int(header.IP4.Len / net.IPv4len)
 	ip6 = int(header.IP6.Len / net.IPv6len)

@@ -41,6 +41,8 @@ typedef struct {
 */
 import "C"
 
+import "unsafe"
+
 type mutex C.ip_blocker_mutex_st
 
 type rwLock C.ip_blocker_rwlock_st
@@ -48,6 +50,14 @@ type rwLock C.ip_blocker_rwlock_st
 type ipBlock C.ip_blocker_ip_block_st
 
 type shmHeader C.ip_blocker_shm_st
+
+func castToHeader(data *byte) *shmHeader {
+	return (*shmHeader)(unsafe.Pointer(data))
+}
+
+func (h *shmHeader) versionPointer() *uint32 {
+	return (*uint32)(unsafe.Pointer(&h.Version))
+}
 
 func (h *shmHeader) rwLocker() *rwLock {
 	return (*rwLock)(&h.Lock)

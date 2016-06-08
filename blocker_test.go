@@ -20,7 +20,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"unsafe"
 )
 
 var nameRand *rand.Rand
@@ -1276,7 +1275,7 @@ func TestServerRWLocker(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
-	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	header := castToHeader(&server.data[0])
 	lock := header.rwLocker()
 	lock.Lock()
 	lock.Unlock()
@@ -1294,7 +1293,7 @@ func TestClientRWLocker(t *testing.T) {
 	defer server.Close()
 	defer client.Close()
 
-	header := (*shmHeader)(unsafe.Pointer(&client.data[0]))
+	header := castToHeader(&client.data[0])
 	lock := header.rwLocker()
 	lock.RLock()
 	lock.RUnlock()
@@ -1577,7 +1576,7 @@ func TestInvalidVersion(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
-	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	header := castToHeader(&server.data[0])
 
 	vx := version
 	if version&0x80000000 == 0 {
@@ -1587,7 +1586,7 @@ func TestInvalidVersion(t *testing.T) {
 	}
 
 	for _, v := range [...]uint32{0xa5a5a5a5, 0, vx} {
-		atomic.StoreUint32((*uint32)(unsafe.Pointer(&header.Version)), v)
+		atomic.StoreUint32(header.versionPointer(), v)
 
 		client, err := Open(server.Name())
 		if err != ErrInvalidSharedMemory {
@@ -1640,7 +1639,7 @@ func TestInvalidHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	header := castToHeader(&server.data[0])
 	orig := *header
 
 	const maxInt = int(^uint(0) >> 1)
@@ -1702,7 +1701,7 @@ func testChangeBeforeLock(t *testing.T, corrupter func(*shmHeader)) {
 	defer server.Unlink()
 	defer server.Close()
 
-	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	header := castToHeader(&server.data[0])
 	lock := header.rwLocker()
 	lock.Lock()
 
@@ -1770,7 +1769,7 @@ func TestCorruptContains(t *testing.T) {
 	defer server.Close()
 	defer client.Close()
 
-	header := (*shmHeader)(unsafe.Pointer(&server.data[0]))
+	header := castToHeader(&server.data[0])
 
 	lock := header.rwLocker()
 	lock.Lock()
@@ -2217,7 +2216,7 @@ func BenchmarkClientRemap(b *testing.B) {
 	defer server.Close()
 	defer client.Close()
 
-	header := (*shmHeader)(unsafe.Pointer(&client.data[0]))
+	header := castToHeader(&client.data[0])
 	header.rwLocker().RLock()
 
 	b.ResetTimer()
@@ -2230,7 +2229,7 @@ func BenchmarkClientRemap(b *testing.B) {
 
 	b.StopTimer()
 
-	header = (*shmHeader)(unsafe.Pointer(&client.data[0]))
+	header = castToHeader(&client.data[0])
 	header.rwLocker().RUnlock()
 }
 
