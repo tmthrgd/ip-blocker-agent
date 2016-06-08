@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	blocker "github.com/tmthrgd/ip-blocker-agent"
+	"github.com/tmthrgd/ip-blocker-agent"
 )
 
 type octalValue int
