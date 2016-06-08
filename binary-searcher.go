@@ -188,42 +188,25 @@ func (s *binarySearcher) RemoveRange(base []byte, num int) []byte {
 }
 
 func (s *binarySearcher) removeRange(base []byte, num int) []byte {
-	if len(base) != s.size {
-		panic("invalid size")
+	startPos := s.Index(base)
+	if startPos*s.size == len(s.Data) {
+		return base
 	}
 
-	x := base
+	var endPos int
 
-	for num > 0 {
-		pos, has := s.search(x)
-		if !has {
-			if pos*s.size == len(s.Data) {
-				break
-			}
-
-			by := subBytes(s.Data[pos*s.size:(pos+1)*s.size], x)
-			num -= by
-
-			for ; by > 0; by-- {
-				incrBytes(x)
-			}
-
-			continue
-		}
-
-		startPos := pos
-
-		for num > 0 && pos*s.size < len(s.Data) && s.compare(x, s.Data[pos*s.size:(pos+1)*s.size]) == 0 {
-			incrBytes(x)
-
-			num--
-			pos++
-		}
-
-		s.Data = append(s.Data[:startPos*s.size], s.Data[pos*s.size:]...)
+	if addIntToBytes(base, num) {
+		endPos = s.Len()
+	} else {
+		endPos = s.Index(base)
 	}
 
-	return x
+	if startPos == endPos {
+		return base
+	}
+
+	s.Data = append(s.Data[:startPos*s.size], s.Data[endPos*s.size:]...)
+	return base
 }
 
 func (s *binarySearcher) Clear() {

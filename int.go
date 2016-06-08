@@ -17,6 +17,23 @@ func incrBytes(b []byte) {
 	}
 }
 
+func addIntToBytes(x []byte, y int) (overflow bool) {
+	for i := len(x) - 1; i >= 0 && y > 0; i-- {
+		c := int(x[i]) + (y & 0xff)
+		y >>= 8
+
+		if c >= 1<<8 {
+			y++
+
+			c -= 1 << 8
+		}
+
+		x[i] = byte(c)
+	}
+
+	return y != 0
+}
+
 func subBytes32(x, y []byte) int {
 	const maxInt = int(^uint(0) >> 1)
 

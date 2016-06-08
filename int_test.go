@@ -9,7 +9,9 @@ import (
 	"bytes"
 	"math/big"
 	"math/rand"
+	"reflect"
 	"testing"
+	"testing/quick"
 )
 
 var intOne = big.NewInt(1)
@@ -49,9 +51,83 @@ func TestIncrement(t *testing.T) {
 	}
 }
 
+func testAddition(t *testing.T, a *big.Int, b int, pad int) {
+	aa := a.Bytes()
+	aa = append(make([]byte, pad-len(aa)), aa...)
+
+	if addIntToBytes(aa, b) {
+		t.Skip("overflow")
+	}
+
+	got := new(big.Int).SetBytes(aa)
+
+	bb := new(big.Int).SetInt64(int64(b))
+	expect := bb.Add(bb, a)
+
+	if expect.Cmp(got) != 0 {
+		diff := new(big.Int).Sub(expect, got)
+		t.Errorf("%s + %d expected %s, got %s, exp - got = %s", a, b, expect, got, diff)
+	}
+}
+
 const maxInt = int(^uint(0) >> 1)
 
 var maxIntBig = big.NewInt(int64(maxInt))
+
+func TestAddition(t *testing.T) {
+	t.Parallel()
+
+	bigIntZero := big.NewInt(0)
+
+	testAddition(t, big.NewInt(10000), 7321, 16)
+	testAddition(t, maxIntBig, maxInt, 16)
+	testAddition(t, maxIntBig, 0, 16)
+	testAddition(t, bigIntZero, 0, 16)
+	testAddition(t, big.NewInt(int64(maxInt>>1)), maxInt>>2, 16)
+
+	testAddition(t, big.NewInt(10000), 7321, 8)
+	testAddition(t, big.NewInt(10000), 7321, 4)
+	testAddition(t, big.NewInt(10000), 7321, 2)
+	testAddition(t, big.NewInt(70), 30, 1)
+	testAddition(t, bigIntZero, 0, 0)
+
+	one := big.NewInt(1)
+
+	if err := quick.Check(func(x []byte, y int) bool {
+		ox := new(big.Int).SetBytes(x)
+		expect := new(big.Int).Add(ox, new(big.Int).SetInt64(int64(y)))
+
+		overflow := addIntToBytes(x, y)
+		got := new(big.Int).SetBytes(x)
+
+		shouldOverflow := expect.Cmp(new(big.Int).Lsh(one, uint(len(x))*8)) != -1
+		if shouldOverflow && overflow {
+			return true
+		}
+
+		if overflow {
+			t.Logf("overflowed on %s + %d", ox, y)
+		}
+
+		if shouldOverflow == overflow && expect.Cmp(got) == 0 {
+			return true
+		}
+
+		diff := new(big.Int).Sub(expect, got)
+		t.Logf("%s + %d expected %s, got %s, exp-got = %s", ox, y, expect, got, diff)
+		return false
+	}, &quick.Config{
+		Values: func(args []reflect.Value, rand *rand.Rand) {
+			x := make([]byte, rand.Int()%32+1)
+			rand.Read(x)
+			args[0] = reflect.ValueOf(x)
+
+			args[1] = reflect.ValueOf(rand.Int() & int(^uint32(0)))
+		},
+	}); err != nil {
+		t.Error(err)
+	}
+}
 
 func subBytesBigInt(ip1, ip2 []byte) int {
 	a := new(big.Int).SetBytes(ip1)
