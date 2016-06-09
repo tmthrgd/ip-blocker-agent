@@ -307,7 +307,7 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 	}
 
 	if insert {
-		ips.insertRange(base, 1<<uint(ones))
+		ips.InsertRange(base, 1<<uint(ones))
 	} else {
 		ips.RemoveRange(base, 1<<uint(ones))
 	}

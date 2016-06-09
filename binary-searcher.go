@@ -8,7 +8,8 @@ package blocker
 import (
 	"bytes"
 	"sort"
-	"sync"
+
+	"github.com/tmthrgd/ip-blocker-agent/internal/incr"
 )
 
 var defaultCompare = bytes.Compare
@@ -104,82 +105,41 @@ func (s *binarySearcher) Remove(b []byte) bool {
 	return false
 }
 
-var bufPool = &sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
-}
-
 func (s *binarySearcher) InsertRange(base []byte, num int) {
-	s.insertRange(append([]byte(nil), base...), num)
-}
+	startPos := s.Index(base)
+	var endPos int
 
-func (s *binarySearcher) insertRange(base []byte, num int) {
-	if len(base) != s.size {
-		panic("invalid size")
-	}
-
-	x := base
-
-	buf := bufPool.Get().(*bytes.Buffer)
-
-	for num > 0 {
-		pos, has := s.search(x)
-		if has {
-			for {
-				incrBytes(x)
-
-				num--
-				pos++
-
-				if num <= 0 || pos*s.size >= len(s.Data) || s.compare(x, s.Data[pos*s.size:(pos+1)*s.size]) != 0 {
-					break
-				}
-			}
-
-			if num <= 0 {
-				break
-			}
+	if startPos*s.size == len(s.Data) {
+		endPos = s.Len()
+	} else {
+		if s.buffer == nil {
+			s.buffer = make([]byte, s.size)
 		}
 
-		var toInsert int
+		end := s.buffer
+		copy(end, base)
 
-		if pos*s.size == len(s.Data) {
-			toInsert = num
-		} else {
-			toInsert = subBytes(s.Data[pos*s.size:(pos+1)*s.size], x)
-			if toInsert > num {
-				toInsert = num
-			}
+		if addIntToBytes(end, num) {
+			panic("overflow")
 		}
 
-		if toInsert > 1<<16 {
-			toInsert = 1 << 16
-		}
-
-		num -= toInsert
-
-		buf.Reset()
-		buf.Grow(toInsert * s.size)
-		buf.Write(x)
-
-		for i := 1; i < toInsert; i++ {
-			incrBytes(x)
-			buf.Write(x)
-		}
-
-		b := buf.Bytes()
-
-		s.Data = append(s.Data, b...)
-		copy(s.Data[(pos+toInsert)*s.size:], s.Data[pos*s.size:])
-		copy(s.Data[pos*s.size:(pos+toInsert)*s.size], b)
-
-		if num != 0 {
-			incrBytes(x)
+		endPos = s.Index(end)
+		if endPos-startPos == num {
+			return
 		}
 	}
 
-	bufPool.Put(buf)
+	if need := (s.Len() - (endPos - startPos) + num) * s.size; cap(s.Data) < need {
+		data := make([]byte, need, need+(need>>3) /*= need * 1.125*/)
+		copy(data, s.Data[:startPos*s.size])
+		copy(data[(startPos+num)*s.size:], s.Data[endPos*s.size:])
+		s.Data = data
+	} else {
+		s.Data = s.Data[:need]
+		copy(s.Data[(startPos+num)*s.size:], s.Data[endPos*s.size:])
+	}
+
+	incr.IncrementBytes(base, s.Data[startPos*s.size:(startPos+num)*s.size])
 }
 
 func (s *binarySearcher) RemoveRange(base []byte, num int) {

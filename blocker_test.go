@@ -1819,8 +1819,17 @@ func TestInsertRangeMassive(t *testing.T) {
 		if ^uint(0) == uint(^uint32(0)) {
 			t.Skip("INSERTMASSIVERANGETEST=2 cannot be run on 32-bit systems")
 		}
+	case "3":
+		mask = "/0"
+
+		expect = 4294967296 - 1
+		expect++
+
+		if ^uint(0) == uint(^uint32(0)) {
+			t.Skip("INSERTMASSIVERANGETEST=3 cannot be run on 32-bit systems")
+		}
 	default:
-		t.Skip("INSERTMASSIVERANGETEST is not set to 1 or 2")
+		t.Skip("INSERTMASSIVERANGETEST is not set to 1, 2 or 3")
 	}
 
 	t.Parallel()
