@@ -30,12 +30,11 @@ func TestEqual(t *testing.T) {
 		return false
 	}, &quick.Config{
 		Values: func(args []reflect.Value, rand *rand.Rand) {
-			base := make([]byte, 4+((rand.Int()&1)*12))
+			base := make([]byte, 4<<uint(rand.Intn(3)))
 			rand.Read(base)
 			args[0] = reflect.ValueOf(base)
 
-			l := (rand.Int() % (1 + 4096/len(base))) * len(base)
-			args[1] = reflect.ValueOf(l)
+			args[1] = reflect.ValueOf(rand.Intn(1 + 4096/len(base)) * len(base))
 		},
 	}); err != nil {
 		t.Error(err)
@@ -130,6 +129,42 @@ func Benchmark4Go65536(b *testing.B) {
 	benchmarkGo(b, 4, 65536)
 }
 
+func Benchmark8Go0(b *testing.B) {
+	benchmarkGo(b, 8, 0)
+}
+
+func Benchmark8Go8(b *testing.B) {
+	benchmarkGo(b, 8, 8)
+}
+
+func Benchmark8Go16(b *testing.B) {
+	benchmarkGo(b, 8, 16)
+}
+
+func Benchmark8Go32(b *testing.B) {
+	benchmarkGo(b, 8, 32)
+}
+
+func Benchmark8Go64(b *testing.B) {
+	benchmarkGo(b, 8, 64)
+}
+
+func Benchmark8Go1024(b *testing.B) {
+	benchmarkGo(b, 8, 1024)
+}
+
+func Benchmark8Go2048(b *testing.B) {
+	benchmarkGo(b, 8, 2048)
+}
+
+func Benchmark8Go4096(b *testing.B) {
+	benchmarkGo(b, 8, 4096)
+}
+
+func Benchmark8Go65536(b *testing.B) {
+	benchmarkGo(b, 8, 65536)
+}
+
 func Benchmark16Go0(b *testing.B) {
 	benchmarkGo(b, 16, 0)
 }
@@ -213,6 +248,42 @@ func Benchmark4Opt4096(b *testing.B) {
 
 func Benchmark4Opt65536(b *testing.B) {
 	benchmark(b, 4, 65536)
+}
+
+func Benchmark8Opt0(b *testing.B) {
+	benchmark(b, 8, 0)
+}
+
+func Benchmark8Opt8(b *testing.B) {
+	benchmark(b, 8, 8)
+}
+
+func Benchmark8Opt16(b *testing.B) {
+	benchmark(b, 8, 16)
+}
+
+func Benchmark8Opt32(b *testing.B) {
+	benchmark(b, 8, 32)
+}
+
+func Benchmark8Opt64(b *testing.B) {
+	benchmark(b, 8, 64)
+}
+
+func Benchmark8Opt1024(b *testing.B) {
+	benchmark(b, 8, 1024)
+}
+
+func Benchmark8Opt2048(b *testing.B) {
+	benchmark(b, 8, 2048)
+}
+
+func Benchmark8Opt4096(b *testing.B) {
+	benchmark(b, 8, 4096)
+}
+
+func Benchmark8Opt65536(b *testing.B) {
+	benchmark(b, 8, 65536)
 }
 
 func Benchmark16Opt0(b *testing.B) {

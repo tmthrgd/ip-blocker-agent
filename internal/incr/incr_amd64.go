@@ -9,6 +9,7 @@ package incr
 
 //go:noescape
 func incrementBytes4Asm(*byte, *byte, uint64)
+func incrementBytes8Asm(*byte, *byte, uint64)
 func incrementBytes16Asm(*byte, *byte, uint64)
 
 func IncrementBytes(base, data []byte) {
@@ -23,6 +24,12 @@ func IncrementBytes(base, data []byte) {
 		}
 
 		incrementBytes4Asm(&base[0], &data[0], uint64(len(data)))
+	case 8:
+		if len(data)&0x07 != 0 {
+			panic("invalid data length")
+		}
+
+		incrementBytes8Asm(&base[0], &data[0], uint64(len(data)))
 	case 16:
 		if len(data)&0x0f != 0 {
 			panic("invalid data length")

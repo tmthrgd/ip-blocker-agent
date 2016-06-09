@@ -17,6 +17,14 @@ func incrBytesIn4Encoding(base, data []byte) {
 	}
 }
 
+func incrBytesIn8Encoding(base, data []byte) {
+	baseUint := binary.BigEndian.Uint64(base)
+
+	for i := 0; i < len(data); i, baseUint = i+8, baseUint+1 {
+		binary.BigEndian.PutUint64(data[i:], baseUint)
+	}
+}
+
 func incrBytesIn16Encoding(base, data []byte) {
 	baseHigh := binary.BigEndian.Uint64(base)
 	baseLow := binary.BigEndian.Uint64(base[8:])
@@ -42,6 +50,12 @@ func IncrementBytes(base, data []byte) {
 		}
 
 		incrBytesIn4Encoding(base, data)
+	case 8:
+		if len(data)&0x07 != 0 {
+			panic("invalid data length")
+		}
+
+		incrBytesIn8Encoding(base, data)
 	case 16:
 		if len(data)&0x0f != 0 {
 			panic("invalid data length")

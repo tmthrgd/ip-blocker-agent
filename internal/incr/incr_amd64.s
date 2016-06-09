@@ -95,6 +95,88 @@ loop_from_ax:
 	MOVL 0(AX), AX
 	JMP loop
 
+DATA avx8IncBy<>+0x00(SB)/8, $0x00
+DATA avx8IncBy<>+0x08(SB)/8, $0x01
+GLOBL avx8IncBy<>(SB), RODATA, $16
+
+DATA avx8IncBy2<>+0x00(SB)/8, $0x02
+DATA avx8IncBy2<>+0x08(SB)/8, $0x02
+GLOBL avx8IncBy2<>(SB), RODATA, $16
+
+DATA avx8BEShuf<>+0x00(SB)/8, $0x0001020304050607
+DATA avx8BEShuf<>+0x08(SB)/8, $0x08090a0b0c0d0e0f
+GLOBL avx8BEShuf<>(SB), RODATA, $16
+
+// func incrementBytes8Asm(*byte, *byte, uint64)
+TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
+	MOVQ base+0(FP), AX
+	MOVQ data+8(FP), BX
+	MOVQ len+16(FP), CX
+
+	CMPQ CX, $16
+	JB loop_from_ax
+
+	CMPB runtime·support_avx(SB), $1
+	JNE loop_from_ax
+
+	MOVQ $avx8BEShuf<>(SB), DX
+
+	MOVQ 0(AX), X0
+	MOVLHPS X0, X0
+	PSHUFB avx8BEShuf<>(SB), X0
+
+	PADDD avx8IncBy<>(SB), X0
+
+	// VPSHUFB 0(DX), X0, X1
+	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
+	MOVUPS X1, 0(BX)
+
+	ADDQ $16, BX
+	SUBQ $16, CX
+	JZ ret
+
+	CMPQ CX, $16
+	JB loop_from_x0
+
+bigloop:
+	PADDD avx8IncBy2<>(SB), X0
+
+	// VPSHUFB 0(DX), X0, X1
+	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
+	MOVUPS X1, 0(BX)
+
+	ADDQ $16, BX
+	SUBQ $16, CX
+	JZ ret
+
+	CMPQ CX, $16
+	JGE bigloop
+
+loop_from_x0:
+	MOVHLPS X0, X0
+	MOVQ X0, AX
+
+	INCQ AX
+	BSWAPQ AX
+
+loop:
+	MOVQ AX, 0(BX)
+
+	BSWAPQ AX
+	INCQ AX
+	BSWAPQ AX
+
+	ADDQ $8, BX
+	SUBQ $8, CX
+	JNZ loop
+
+ret:
+	RET
+
+loop_from_ax:
+	MOVQ 0(AX), AX
+	JMP loop
+
 DATA avx16IncBy<>+0x00(SB)/8, $0x00
 DATA avx16IncBy<>+0x08(SB)/8, $0x01
 GLOBL avx16IncBy<>(SB), RODATA, $16
