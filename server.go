@@ -309,7 +309,7 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 	if insert {
 		ips.insertRange(base, 1<<uint(ones))
 	} else {
-		ips.removeRange(base, 1<<uint(ones))
+		ips.RemoveRange(base, 1<<uint(ones))
 	}
 
 	if s.batching {

@@ -110,11 +110,11 @@ var bufPool = &sync.Pool{
 	},
 }
 
-func (s *binarySearcher) InsertRange(base []byte, num int) []byte {
-	return s.insertRange(append([]byte(nil), base...), num)
+func (s *binarySearcher) InsertRange(base []byte, num int) {
+	s.insertRange(append([]byte(nil), base...), num)
 }
 
-func (s *binarySearcher) insertRange(base []byte, num int) []byte {
+func (s *binarySearcher) insertRange(base []byte, num int) {
 	if len(base) != s.size {
 		panic("invalid size")
 	}
@@ -180,33 +180,32 @@ func (s *binarySearcher) insertRange(base []byte, num int) []byte {
 	}
 
 	bufPool.Put(buf)
-	return x
 }
 
-func (s *binarySearcher) RemoveRange(base []byte, num int) []byte {
-	return s.removeRange(append([]byte(nil), base...), num)
-}
-
-func (s *binarySearcher) removeRange(base []byte, num int) []byte {
+func (s *binarySearcher) RemoveRange(base []byte, num int) {
 	startPos := s.Index(base)
 	if startPos*s.size == len(s.Data) {
-		return base
+		return
 	}
+
+	if s.buffer == nil {
+		s.buffer = make([]byte, s.size)
+	}
+
+	end := s.buffer
+	copy(end, base)
 
 	var endPos int
 
-	if addIntToBytes(base, num) {
+	if addIntToBytes(end, num) {
 		endPos = s.Len()
 	} else {
-		endPos = s.Index(base)
+		endPos = s.Index(end)
 	}
 
-	if startPos == endPos {
-		return base
+	if startPos != endPos {
+		s.Data = append(s.Data[:startPos*s.size], s.Data[endPos*s.size:]...)
 	}
-
-	s.Data = append(s.Data[:startPos*s.size], s.Data[endPos*s.size:]...)
-	return base
 }
 
 func (s *binarySearcher) Clear() {
