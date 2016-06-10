@@ -300,8 +300,8 @@ loop_from_x0x1:
 	MOVQ X0, AX
 	MOVQ X1, DX
 
-	INCQ AX
-	JNO skiped_high_1
+	ADDQ $1, AX
+	JNC skiped_high_1
 
 	INCQ DX
 
@@ -314,8 +314,8 @@ loop:
 	MOVQ AX, 8(BX)
 
 	BSWAPQ AX
-	INCQ AX
-	JNO skiped_high_2
+	ADDQ $1, AX
+	JNC skiped_high_2
 
 	BSWAPQ DX
 	INCQ DX
