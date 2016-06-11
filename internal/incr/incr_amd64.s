@@ -189,13 +189,9 @@ DATA avx16Overflow<>+0x00(SB)/8, $0
 DATA avx16Overflow<>+0x08(SB)/8, $0xffffffffffffffff
 GLOBL avx16Overflow<>(SB), RODATA, $16
 
-DATA avx16Overflow2<>+0x00(SB)/8, $0xfffffffffffffffe
-DATA avx16Overflow2<>+0x08(SB)/8, $0xfffffffffffffffe
+DATA avx16Overflow2<>+0x00(SB)/8, $0xffffffffffffffff
+DATA avx16Overflow2<>+0x08(SB)/8, $0xffffffffffffffff
 GLOBL avx16Overflow2<>(SB), RODATA, $16
-
-DATA avx16Overflow3<>+0x00(SB)/8, $0xffffffffffffffff
-DATA avx16Overflow3<>+0x08(SB)/8, $0xffffffffffffffff
-GLOBL avx16Overflow3<>(SB), RODATA, $16
 
 DATA avx16BEShuf<>+0x00(SB)/8, $0x0001020304050607
 DATA avx16BEShuf<>+0x08(SB)/8, $0x08090a0b0c0d0e0f
@@ -223,8 +219,8 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 
 	MOVQ $avx16Overflow<>(SB), DX
 	MOVQ $avx16Overflow2<>(SB), R10
-	MOVQ $avx16Overflow3<>(SB), R11
 	MOVQ $avx16BEShuf<>(SB), R9
+	MOVQ $avx16QOne2<>(SB), R11
 
 	MOVQ 0(AX), X1
 	MOVLHPS X1, X1
@@ -263,11 +259,10 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	JB loop_from_x0x1
 
 bigloop:
-	// VPCMPEQQ (R10), X0, X2
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x29; BYTE $0x12
-	// VPCMPEQQ (R11), X0, X5
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x29; BYTE $0x2b
-	POR X5, X2
+	// VPOR (R11), X0, X2
+	BYTE $0xc4; BYTE $0xc1; BYTE $0x79; BYTE $0xeb; BYTE $0x13
+	// PCMPEQQ (R10), X2
+	BYTE $0x66; BYTE $0x41; BYTE $0x0f; BYTE $0x38; BYTE $0x29; BYTE $0x12
 	PAND avx16QOne2<>(SB), X2
 	PADDQ X2, X1
 
