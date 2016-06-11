@@ -285,11 +285,8 @@ loop_from_x0x1:
 	MOVQ X1, DX
 
 	ADDQ $1, AX
-	JNC skiped_high_1
-
-	INCQ DX
-
-skiped_high_1:
+	SETCS BX
+	ADDQ BX, DX
 	BSWAPQ DX
 	BSWAPQ AX
 
