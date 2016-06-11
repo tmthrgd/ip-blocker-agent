@@ -7,15 +7,15 @@
 
 #include "textflag.h"
 
-DATA avxIncBy<>+0x00(SB)/4, $0x00
-DATA avxIncBy<>+0x04(SB)/4, $0x01
-DATA avxIncBy<>+0x08(SB)/4, $0x02
-DATA avxIncBy<>+0x0c(SB)/4, $0x03
-DATA avxIncBy<>+0x10(SB)/4, $0x04
-DATA avxIncBy<>+0x14(SB)/4, $0x04
-DATA avxIncBy<>+0x18(SB)/4, $0x04
-DATA avxIncBy<>+0x1c(SB)/4, $0x04
-GLOBL avxIncBy<>(SB), RODATA, $32
+DATA avx4IncBy<>+0x00(SB)/4, $0x00
+DATA avx4IncBy<>+0x04(SB)/4, $0x01
+DATA avx4IncBy<>+0x08(SB)/4, $0x02
+DATA avx4IncBy<>+0x0c(SB)/4, $0x03
+DATA avx4IncBy<>+0x10(SB)/4, $0x04
+DATA avx4IncBy<>+0x14(SB)/4, $0x04
+DATA avx4IncBy<>+0x18(SB)/4, $0x04
+DATA avx4IncBy<>+0x1c(SB)/4, $0x04
+GLOBL avx4IncBy<>(SB), RODATA, $32
 
 DATA avxBEShuf<>+0x00(SB)/4, $0x00010203
 DATA avxBEShuf<>+0x04(SB)/4, $0x04050607
@@ -41,7 +41,7 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x18; BYTE $0x00
 	PSHUFB avxBEShuf<>(SB), X0
 
-	PADDD avxIncBy<>(SB), X0
+	PADDD avx4IncBy<>(SB), X0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
@@ -55,7 +55,7 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	JB loop_from_x0
 
 bigloop:
-	PADDD avxIncBy<>+16(SB), X0
+	PADDD avx4IncBy<>+16(SB), X0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
