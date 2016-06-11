@@ -1907,7 +1907,7 @@ func BenchmarkOpen(b *testing.B) {
 	}
 }
 
-func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
+func benchmarkInsert(b *testing.B, addr string, extra int) {
 	server, _, err := setup(false)
 	if err != nil {
 		b.Fatal(err)
@@ -1916,10 +1916,8 @@ func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
 	defer server.Unlink()
 	defer server.Close()
 
-	if batch {
-		if err = server.Batch(); err != nil {
-			b.Error(err)
-		}
+	if err = server.Batch(); err != nil {
+		b.Error(err)
 	}
 
 	ip := net.ParseIP(addr)
@@ -1955,38 +1953,22 @@ func benchmarkInsert(b *testing.B, addr string, extra int, batch bool) {
 }
 
 func BenchmarkInsertIP4NoSearch(b *testing.B) {
-	benchmarkInsert(b, "192.0.2.0", 0, false)
+	benchmarkInsert(b, "192.0.2.0", 0)
 }
 
 func BenchmarkInsertIP6NoSearch(b *testing.B) {
-	benchmarkInsert(b, "2001:db8::", 0, false)
+	benchmarkInsert(b, "2001:db8::", 0)
 }
 
 func BenchmarkInsertIP4(b *testing.B) {
-	benchmarkInsert(b, "192.0.2.0", 10000, false)
+	benchmarkInsert(b, "192.0.2.0", 10000)
 }
 
 func BenchmarkInsertIP6(b *testing.B) {
-	benchmarkInsert(b, "2001:db8::", 10000, false)
+	benchmarkInsert(b, "2001:db8::", 10000)
 }
 
-func BenchmarkInsertBatchIP4NoSearch(b *testing.B) {
-	benchmarkInsert(b, "192.0.2.0", 0, true)
-}
-
-func BenchmarkInsertBatchIP6NoSearch(b *testing.B) {
-	benchmarkInsert(b, "2001:db8::", 0, true)
-}
-
-func BenchmarkInsertBatchIP4(b *testing.B) {
-	benchmarkInsert(b, "192.0.2.0", 10000, true)
-}
-
-func BenchmarkInsertBatchIP6(b *testing.B) {
-	benchmarkInsert(b, "2001:db8::", 10000, true)
-}
-
-func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
+func benchmarkRemove(b *testing.B, addr string, extra int) {
 	server, _, err := setup(false)
 	if err != nil {
 		b.Fatal(err)
@@ -1995,10 +1977,8 @@ func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
 	defer server.Unlink()
 	defer server.Close()
 
-	if batch {
-		if err = server.Batch(); err != nil {
-			b.Error(err)
-		}
+	if err = server.Batch(); err != nil {
+		b.Error(err)
 	}
 
 	ip := net.ParseIP(addr)
@@ -2034,35 +2014,19 @@ func benchmarkRemove(b *testing.B, addr string, extra int, batch bool) {
 }
 
 func BenchmarkRemoveIP4NoSearch(b *testing.B) {
-	benchmarkRemove(b, "192.0.2.0", 0, false)
+	benchmarkRemove(b, "192.0.2.0", 0)
 }
 
 func BenchmarkRemoveIP6NoSearch(b *testing.B) {
-	benchmarkRemove(b, "2001:db8::", 0, false)
+	benchmarkRemove(b, "2001:db8::", 0)
 }
 
 func BenchmarkRemoveIP4(b *testing.B) {
-	benchmarkRemove(b, "192.0.2.0", 10000, false)
+	benchmarkRemove(b, "192.0.2.0", 10000)
 }
 
 func BenchmarkRemoveIP6(b *testing.B) {
-	benchmarkRemove(b, "2001:db8::", 10000, false)
-}
-
-func BenchmarkRemoveBatchIP4NoSearch(b *testing.B) {
-	benchmarkRemove(b, "192.0.2.0", 0, true)
-}
-
-func BenchmarkRemoveBatchIP6NoSearch(b *testing.B) {
-	benchmarkRemove(b, "2001:db8::", 0, true)
-}
-
-func BenchmarkRemoveBatchIP4(b *testing.B) {
-	benchmarkRemove(b, "192.0.2.0", 10000, true)
-}
-
-func BenchmarkRemoveBatchIP6(b *testing.B) {
-	benchmarkRemove(b, "2001:db8::", 10000, true)
+	benchmarkRemove(b, "2001:db8::", 10000)
 }
 
 func benchmarkContains(b *testing.B, addr string, extra int) {
