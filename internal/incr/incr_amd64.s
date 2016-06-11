@@ -107,8 +107,7 @@ bigloop:
 	JGE bigloop
 
 loop_from_x0:
-	PSHUFD $0xff, X0, X0
-	MOVL X0, AX
+	PEXTRD $3, X0, AX
 
 	INCL AX
 	BSWAPL AX
@@ -225,8 +224,7 @@ bigloop:
 	JGE bigloop
 
 loop_from_x0:
-	MOVHLPS X0, X0
-	MOVQ X0, AX
+	PEXTRQ $1, X0, AX
 
 	INCQ AX
 	BSWAPQ AX
@@ -354,11 +352,8 @@ bigloop:
 	JGE bigloop
 
 loop_from_x0x1:
-	MOVHLPS X0, X0
-	MOVHLPS X1, X1
-
-	MOVQ X0, AX
-	MOVQ X1, DX
+	PEXTRQ $1, X0, AX
+	PEXTRQ $1, X1, DX
 
 	ADDQ $1, AX
 	SETCS BX
