@@ -17,11 +17,11 @@ DATA avx4IncBy<>+0x18(SB)/4, $0x04
 DATA avx4IncBy<>+0x1c(SB)/4, $0x04
 GLOBL avx4IncBy<>(SB), RODATA, $32
 
-DATA avxBEShuf<>+0x00(SB)/4, $0x00010203
-DATA avxBEShuf<>+0x04(SB)/4, $0x04050607
-DATA avxBEShuf<>+0x08(SB)/4, $0x08090a0b
-DATA avxBEShuf<>+0x0c(SB)/4, $0x0c0d0e0f
-GLOBL avxBEShuf<>(SB), RODATA, $16
+DATA avx4BEShuf<>+0x00(SB)/4, $0x00010203
+DATA avx4BEShuf<>+0x04(SB)/4, $0x04050607
+DATA avx4BEShuf<>+0x08(SB)/4, $0x08090a0b
+DATA avx4BEShuf<>+0x0c(SB)/4, $0x0c0d0e0f
+GLOBL avx4BEShuf<>(SB), RODATA, $16
 
 // func incrementBytes4Asm(*byte, *byte, uint64)
 TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
@@ -35,11 +35,11 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	CMPB runtime·support_avx(SB), $1
 	JNE loop_from_ax
 
-	MOVQ $avxBEShuf<>(SB), DX
+	MOVQ $avx4BEShuf<>(SB), DX
 
 	// VBROADCASTSS 0(AX), X0
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x18; BYTE $0x00
-	PSHUFB avxBEShuf<>(SB), X0
+	PSHUFB avx4BEShuf<>(SB), X0
 
 	PADDD avx4IncBy<>(SB), X0
 
