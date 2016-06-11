@@ -54,6 +54,44 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	CMPQ CX, $16
 	JB loop_from_x0
 
+	CMPQ CX, $64
+	JB bigloop
+
+hugeloop:
+	PADDD avx4IncBy<>+16(SB), X0
+
+	// VPSHUFB 0(DX), X0, X1
+	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
+	MOVUPS X1, 0(DI)
+
+	PADDD avx4IncBy<>+16(SB), X0
+
+	// VPSHUFB 0(DX), X0, X1
+	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
+	MOVUPS X1, 16(DI)
+
+	PADDD avx4IncBy<>+16(SB), X0
+
+	// VPSHUFB 0(DX), X0, X1
+	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
+	MOVUPS X1, 32(DI)
+
+	PADDD avx4IncBy<>+16(SB), X0
+
+	// VPSHUFB 0(DX), X0, X1
+	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
+	MOVUPS X1, 48(DI)
+
+	ADDQ $64, DI
+	SUBQ $64, CX
+	JZ ret
+
+	CMPQ CX, $64
+	JGE hugeloop
+
+	CMPQ CX, $16
+	JB loop_from_x0
+
 bigloop:
 	PADDD avx4IncBy<>+16(SB), X0
 
