@@ -11,13 +11,11 @@ DATA avxIncBy<>+0x00(SB)/4, $0x00
 DATA avxIncBy<>+0x04(SB)/4, $0x01
 DATA avxIncBy<>+0x08(SB)/4, $0x02
 DATA avxIncBy<>+0x0c(SB)/4, $0x03
-GLOBL avxIncBy<>(SB), RODATA, $16
-
-DATA avxIncBy2<>+0x00(SB)/4, $0x04
-DATA avxIncBy2<>+0x04(SB)/4, $0x04
-DATA avxIncBy2<>+0x08(SB)/4, $0x04
-DATA avxIncBy2<>+0x0c(SB)/4, $0x04
-GLOBL avxIncBy2<>(SB), RODATA, $16
+DATA avxIncBy<>+0x10(SB)/4, $0x04
+DATA avxIncBy<>+0x14(SB)/4, $0x04
+DATA avxIncBy<>+0x18(SB)/4, $0x04
+DATA avxIncBy<>+0x1c(SB)/4, $0x04
+GLOBL avxIncBy<>(SB), RODATA, $32
 
 DATA avxBEShuf<>+0x00(SB)/4, $0x00010203
 DATA avxBEShuf<>+0x04(SB)/4, $0x04050607
@@ -57,7 +55,7 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	JB loop_from_x0
 
 bigloop:
-	PADDD avxIncBy2<>(SB), X0
+	PADDD avxIncBy<>+16(SB), X0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
@@ -97,11 +95,9 @@ loop_from_ax:
 
 DATA avx8IncBy<>+0x00(SB)/8, $0x00
 DATA avx8IncBy<>+0x08(SB)/8, $0x01
-GLOBL avx8IncBy<>(SB), RODATA, $16
-
-DATA avx8IncBy2<>+0x00(SB)/8, $0x02
-DATA avx8IncBy2<>+0x08(SB)/8, $0x02
-GLOBL avx8IncBy2<>(SB), RODATA, $16
+DATA avx8IncBy<>+0x10(SB)/8, $0x02
+DATA avx8IncBy<>+0x18(SB)/8, $0x02
+GLOBL avx8IncBy<>(SB), RODATA, $32
 
 DATA avx8BEShuf<>+0x00(SB)/8, $0x0001020304050607
 DATA avx8BEShuf<>+0x08(SB)/8, $0x08090a0b0c0d0e0f
@@ -139,7 +135,7 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	JB loop_from_x0
 
 bigloop:
-	PADDQ avx8IncBy2<>(SB), X0
+	PADDQ avx8IncBy<>+16(SB), X0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
@@ -179,19 +175,15 @@ loop_from_ax:
 
 DATA avx16IncBy<>+0x00(SB)/8, $0x00
 DATA avx16IncBy<>+0x08(SB)/8, $0x01
-GLOBL avx16IncBy<>(SB), RODATA, $16
-
-DATA avx16IncBy2<>+0x00(SB)/8, $0x02
-DATA avx16IncBy2<>+0x08(SB)/8, $0x02
-GLOBL avx16IncBy2<>(SB), RODATA, $16
+DATA avx16IncBy<>+0x10(SB)/8, $0x02
+DATA avx16IncBy<>+0x18(SB)/8, $0x02
+GLOBL avx16IncBy<>(SB), RODATA, $32
 
 DATA avx16Overflow<>+0x00(SB)/8, $0
 DATA avx16Overflow<>+0x08(SB)/8, $0xffffffffffffffff
-GLOBL avx16Overflow<>(SB), RODATA, $16
-
-DATA avx16Overflow2<>+0x00(SB)/8, $0xffffffffffffffff
-DATA avx16Overflow2<>+0x08(SB)/8, $0xffffffffffffffff
-GLOBL avx16Overflow2<>(SB), RODATA, $16
+DATA avx16Overflow<>+0x10(SB)/8, $0xffffffffffffffff
+DATA avx16Overflow<>+0x18(SB)/8, $0xffffffffffffffff
+GLOBL avx16Overflow<>(SB), RODATA, $32
 
 DATA avx16BEShuf<>+0x00(SB)/8, $0x0001020304050607
 DATA avx16BEShuf<>+0x08(SB)/8, $0x08090a0b0c0d0e0f
@@ -199,11 +191,9 @@ GLOBL avx16BEShuf<>(SB), RODATA, $16
 
 DATA avx16QOne<>+0x00(SB)/8, $0x00
 DATA avx16QOne<>+0x08(SB)/8, $0x01
-GLOBL avx16QOne<>(SB), RODATA, $16
-
-DATA avx16QOne2<>+0x00(SB)/8, $0x01
-DATA avx16QOne2<>+0x08(SB)/8, $0x01
-GLOBL avx16QOne2<>(SB), RODATA, $16
+DATA avx16QOne<>+0x10(SB)/8, $0x01
+DATA avx16QOne<>+0x18(SB)/8, $0x01
+GLOBL avx16QOne<>(SB), RODATA, $32
 
 // func incrementBytes16Asm(*byte, *byte, uint64)
 TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
@@ -217,10 +207,9 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	CMPB runtime·support_avx(SB), $1
 	JNE loop_from_ax
 
-	MOVQ $avx16Overflow<>(SB), DX
-	MOVQ $avx16Overflow2<>(SB), R10
 	MOVQ $avx16BEShuf<>(SB), R9
-	MOVQ $avx16QOne2<>(SB), R11
+	MOVQ $avx16Overflow<>(SB), R10
+	MOVQ $avx16QOne<>(SB), R11
 
 	MOVQ 0(AX), X1
 	MOVLHPS X1, X1
@@ -231,8 +220,8 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	PSHUFB avx16BEShuf<>(SB), X0
 	PSHUFB avx16BEShuf<>(SB), X1
 
-	// VPCMPEQQ (DX), X0, X2
-	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x29; BYTE $0x12
+	// VPCMPEQQ (R10), X0, X2
+	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x29; BYTE $0x12
 	PAND avx16QOne<>(SB), X2
 	PADDQ X2, X1
 
@@ -259,14 +248,14 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	JB loop_from_x0x1
 
 bigloop:
-	// VPOR (R11), X0, X2
-	BYTE $0xc4; BYTE $0xc1; BYTE $0x79; BYTE $0xeb; BYTE $0x13
-	// PCMPEQQ (R10), X2
-	BYTE $0x66; BYTE $0x41; BYTE $0x0f; BYTE $0x38; BYTE $0x29; BYTE $0x12
-	PAND avx16QOne2<>(SB), X2
+	// VPOR 16(R11), X0, X2
+	BYTE $0xc4; BYTE $0xc1; BYTE $0x79; BYTE $0xeb; BYTE $0x53; BYTE $0x10
+	// PCMPEQQ 16(R10), X2
+	BYTE $0x66; BYTE $0x41; BYTE $0x0f; BYTE $0x38; BYTE $0x29; BYTE $0x52; BYTE $0x10
+	PAND avx16QOne<>+16(SB), X2
 	PADDQ X2, X1
 
-	PADDQ avx16IncBy2<>(SB), X0
+	PADDQ avx16IncBy<>+16(SB), X0
 
 	// VPSHUFB 0(R9), X0, X3
 	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0x19
