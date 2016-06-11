@@ -367,13 +367,8 @@ loop:
 
 	BSWAPQ AX
 	ADDQ $1, AX
-	JNC skiped_high_2
-
-	BSWAPQ DX
-	INCQ DX
-	BSWAPQ DX
-
-skiped_high_2:
+	JC increment_dx
+incremented_dx:
 	BSWAPQ AX
 
 	ADDQ $16, DI
@@ -387,3 +382,10 @@ loop_from_ax:
 	MOVQ 0(AX), DX
 	MOVQ 8(AX), AX
 	JMP loop
+
+increment_dx:
+	BSWAPQ DX
+	INCQ DX
+	BSWAPQ DX
+
+	JMP incremented_dx
