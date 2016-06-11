@@ -125,7 +125,7 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	MOVLHPS X0, X0
 	PSHUFB avx8BEShuf<>(SB), X0
 
-	PADDD avx8IncBy<>(SB), X0
+	PADDQ avx8IncBy<>(SB), X0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
@@ -139,7 +139,7 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	JB loop_from_x0
 
 bigloop:
-	PADDD avx8IncBy2<>(SB), X0
+	PADDQ avx8IncBy2<>(SB), X0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
