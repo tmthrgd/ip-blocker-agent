@@ -12,28 +12,12 @@ import (
 	"github.com/tmthrgd/ip-blocker-agent/internal/incr"
 )
 
-var defaultCompare = bytes.Compare
-
 type binarySearcher struct {
 	Data []byte
 
 	size int
 
-	compare func(a, b []byte) int
-
 	buffer []byte
-}
-
-func newBinarySearcher(size int, compare func(a, b []byte) int) *binarySearcher {
-	if compare == nil {
-		compare = defaultCompare
-	}
-
-	return &binarySearcher{
-		size: size,
-
-		compare: compare,
-	}
 }
 
 func (s *binarySearcher) Len() int {
@@ -41,7 +25,7 @@ func (s *binarySearcher) Len() int {
 }
 
 func (s *binarySearcher) Less(i, j int) bool {
-	return s.compare(s.Data[i*s.size:(i+1)*s.size], s.Data[j*s.size:(j+1)*s.size]) < 0
+	return bytes.Compare(s.Data[i*s.size:(i+1)*s.size], s.Data[j*s.size:(j+1)*s.size]) < 0
 }
 
 func (s *binarySearcher) Swap(i, j int) {
@@ -68,13 +52,13 @@ func (s *binarySearcher) Index(check []byte) int {
 	}
 
 	return sort.Search(s.Len(), func(i int) bool {
-		return s.compare(s.Data[i*s.size:(i+1)*s.size], check) >= 0
+		return bytes.Compare(s.Data[i*s.size:(i+1)*s.size], check) >= 0
 	})
 }
 
 func (s *binarySearcher) search(check []byte) (pos int, has bool) {
 	pos = s.Index(check)
-	has = pos*s.size < len(s.Data) && s.compare(check, s.Data[pos*s.size:(pos+1)*s.size]) == 0
+	has = pos*s.size < len(s.Data) && bytes.Equal(check, s.Data[pos*s.size:(pos+1)*s.size])
 	return
 }
 

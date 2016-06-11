@@ -104,9 +104,9 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	return &Server{
 		file: file,
 
-		ip4s:  binarySearcher{size: net.IPv4len, compare: defaultCompare},
-		ip6s:  binarySearcher{size: net.IPv6len, compare: defaultCompare},
-		ip6rs: binarySearcher{size: net.IPv6len / 2, compare: defaultCompare},
+		ip4s:  binarySearcher{size: net.IPv4len},
+		ip6s:  binarySearcher{size: net.IPv6len},
+		ip6rs: binarySearcher{size: net.IPv6len / 2},
 
 		data: data,
 		end:  end,
