@@ -26,7 +26,7 @@ GLOBL avx4BEShuf<>(SB), RODATA, $16
 // func incrementBytes4Asm(*byte, *byte, uint64)
 TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	MOVQ base+0(FP), AX
-	MOVQ data+8(FP), BX
+	MOVQ data+8(FP), DI
 	MOVQ len+16(FP), CX
 
 	CMPQ CX, $16
@@ -45,9 +45,9 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
-	MOVUPS X1, 0(BX)
+	MOVUPS X1, 0(DI)
 
-	ADDQ $16, BX
+	ADDQ $16, DI
 	SUBQ $16, CX
 	JZ ret
 
@@ -59,9 +59,9 @@ bigloop:
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
-	MOVUPS X1, 0(BX)
+	MOVUPS X1, 0(DI)
 
-	ADDQ $16, BX
+	ADDQ $16, DI
 	SUBQ $16, CX
 	JZ ret
 
@@ -76,13 +76,13 @@ loop_from_x0:
 	BSWAPL AX
 
 loop:
-	MOVL AX, 0(BX)
+	MOVL AX, 0(DI)
 
 	BSWAPL AX
 	INCL AX
 	BSWAPL AX
 
-	ADDQ $4, BX
+	ADDQ $4, DI
 	SUBQ $4, CX
 	JNZ loop
 
@@ -106,7 +106,7 @@ GLOBL avx8BEShuf<>(SB), RODATA, $16
 // func incrementBytes8Asm(*byte, *byte, uint64)
 TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	MOVQ base+0(FP), AX
-	MOVQ data+8(FP), BX
+	MOVQ data+8(FP), DI
 	MOVQ len+16(FP), CX
 
 	CMPQ CX, $16
@@ -125,9 +125,9 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
-	MOVUPS X1, 0(BX)
+	MOVUPS X1, 0(DI)
 
-	ADDQ $16, BX
+	ADDQ $16, DI
 	SUBQ $16, CX
 	JZ ret
 
@@ -139,9 +139,9 @@ bigloop:
 
 	// VPSHUFB 0(DX), X0, X1
 	BYTE $0xc4; BYTE $0xe2; BYTE $0x79; BYTE $0x00; BYTE $0x0a
-	MOVUPS X1, 0(BX)
+	MOVUPS X1, 0(DI)
 
-	ADDQ $16, BX
+	ADDQ $16, DI
 	SUBQ $16, CX
 	JZ ret
 
@@ -156,13 +156,13 @@ loop_from_x0:
 	BSWAPQ AX
 
 loop:
-	MOVQ AX, 0(BX)
+	MOVQ AX, 0(DI)
 
 	BSWAPQ AX
 	INCQ AX
 	BSWAPQ AX
 
-	ADDQ $8, BX
+	ADDQ $8, DI
 	SUBQ $8, CX
 	JNZ loop
 
@@ -198,7 +198,7 @@ GLOBL avx16QOne<>(SB), RODATA, $32
 // func incrementBytes16Asm(*byte, *byte, uint64)
 TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	MOVQ base+0(FP), AX
-	MOVQ data+8(FP), BX
+	MOVQ data+8(FP), DI
 	MOVQ len+16(FP), CX
 
 	CMPQ CX, $32
@@ -234,13 +234,13 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 
 	// VPUNPCKLQDQ X3, X4, X2
 	BYTE $0xc5; BYTE $0xd9; BYTE $0x6c; BYTE $0xd3
-	MOVUPS X2, 0(BX)
+	MOVUPS X2, 0(DI)
 
 	// VPUNPCKHQDQ X3, X4, X2
 	BYTE $0xc5; BYTE $0xd9; BYTE $0x6d; BYTE $0xd3
-	MOVUPS X2, 16(BX)
+	MOVUPS X2, 16(DI)
 
-	ADDQ $32, BX
+	ADDQ $32, DI
 	SUBQ $32, CX
 	JZ ret
 
@@ -264,13 +264,13 @@ bigloop:
 
 	// VPUNPCKLQDQ X3, X4, X2
 	BYTE $0xc5; BYTE $0xd9; BYTE $0x6c; BYTE $0xd3
-	MOVUPS X2, 0(BX)
+	MOVUPS X2, 0(DI)
 
 	// VPUNPCKHQDQ X3, X4, X2
 	BYTE $0xc5; BYTE $0xd9; BYTE $0x6d; BYTE $0xd3
-	MOVUPS X2, 16(BX)
+	MOVUPS X2, 16(DI)
 
-	ADDQ $32, BX
+	ADDQ $32, DI
 	SUBQ $32, CX
 	JZ ret
 
@@ -294,8 +294,8 @@ skiped_high_1:
 	BSWAPQ AX
 
 loop:
-	MOVQ DX, 0(BX)
-	MOVQ AX, 8(BX)
+	MOVQ DX, 0(DI)
+	MOVQ AX, 8(DI)
 
 	BSWAPQ AX
 	ADDQ $1, AX
@@ -308,7 +308,7 @@ loop:
 skiped_high_2:
 	BSWAPQ AX
 
-	ADDQ $16, BX
+	ADDQ $16, DI
 	SUBQ $16, CX
 	JNZ loop
 
