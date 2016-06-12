@@ -59,15 +59,13 @@ func setup(withClient bool) (*Server, *Client, error) {
 }
 
 func insertRemoveRangeSlowHook(insert bool, ip net.IP, ipnet *net.IPNet, ips *binarySearcher) {
-	size := ips.Size()
-
 	if insert {
-		for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
-			ips.Insert(ip[:size])
+		for ; ipnet.Contains(ip); incrBytes(ip[:ips.Size]) {
+			ips.Insert(ip[:ips.Size])
 		}
 	} else {
-		for ; ipnet.Contains(ip); incrBytes(ip[:size]) {
-			ips.Remove(ip[:size])
+		for ; ipnet.Contains(ip); incrBytes(ip[:ips.Size]) {
+			ips.Remove(ip[:ips.Size])
 		}
 	}
 }

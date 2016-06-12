@@ -15,50 +15,46 @@ import (
 type binarySearcher struct {
 	Data []byte
 
-	size int
+	Size int
 
 	buffer []byte
 }
 
 func (s *binarySearcher) Len() int {
-	return len(s.Data) / s.size
+	return len(s.Data) / s.Size
 }
 
 func (s *binarySearcher) Less(i, j int) bool {
-	return bytes.Compare(s.Data[i*s.size:(i+1)*s.size], s.Data[j*s.size:(j+1)*s.size]) < 0
+	return bytes.Compare(s.Data[i*s.Size:(i+1)*s.Size], s.Data[j*s.Size:(j+1)*s.Size]) < 0
 }
 
 func (s *binarySearcher) Swap(i, j int) {
 	if s.buffer == nil {
-		s.buffer = make([]byte, s.size)
+		s.buffer = make([]byte, s.Size)
 	}
 
-	copy(s.buffer, s.Data[i*s.size:(i+1)*s.size])
-	copy(s.Data[i*s.size:(i+1)*s.size], s.Data[j*s.size:(j+1)*s.size])
-	copy(s.Data[j*s.size:(j+1)*s.size], s.buffer)
+	copy(s.buffer, s.Data[i*s.Size:(i+1)*s.Size])
+	copy(s.Data[i*s.Size:(i+1)*s.Size], s.Data[j*s.Size:(j+1)*s.Size])
+	copy(s.Data[j*s.Size:(j+1)*s.Size], s.buffer)
 }
 
 func (s *binarySearcher) Sort() {
 	sort.Sort(s)
 }
 
-func (s *binarySearcher) Size() int {
-	return s.size
-}
-
 func (s *binarySearcher) Index(check []byte) int {
-	if len(check) != s.size {
+	if len(check) != s.Size {
 		panic("invalid size")
 	}
 
 	return sort.Search(s.Len(), func(i int) bool {
-		return bytes.Compare(s.Data[i*s.size:(i+1)*s.size], check) >= 0
+		return bytes.Compare(s.Data[i*s.Size:(i+1)*s.Size], check) >= 0
 	})
 }
 
 func (s *binarySearcher) search(check []byte) (pos int, has bool) {
 	pos = s.Index(check)
-	has = pos*s.size < len(s.Data) && bytes.Equal(check, s.Data[pos*s.size:(pos+1)*s.size])
+	has = pos*s.Size < len(s.Data) && bytes.Equal(check, s.Data[pos*s.Size:(pos+1)*s.Size])
 	return
 }
 
@@ -74,15 +70,15 @@ func (s *binarySearcher) Insert(b []byte) bool {
 	}
 
 	s.Data = append(s.Data, b...)
-	copy(s.Data[(pos+1)*s.size:], s.Data[pos*s.size:])
-	copy(s.Data[pos*s.size:(pos+1)*s.size], b)
+	copy(s.Data[(pos+1)*s.Size:], s.Data[pos*s.Size:])
+	copy(s.Data[pos*s.Size:(pos+1)*s.Size], b)
 	return true
 }
 
 func (s *binarySearcher) Remove(b []byte) bool {
 	pos, has := s.search(b)
 	if has {
-		s.Data = append(s.Data[:pos*s.size], s.Data[(pos+1)*s.size:]...)
+		s.Data = append(s.Data[:pos*s.Size], s.Data[(pos+1)*s.Size:]...)
 		return true
 	}
 
@@ -93,11 +89,11 @@ func (s *binarySearcher) InsertRange(base []byte, num int) {
 	startPos := s.Index(base)
 	var endPos int
 
-	if startPos*s.size == len(s.Data) {
+	if startPos*s.Size == len(s.Data) {
 		endPos = s.Len()
 	} else {
 		if s.buffer == nil {
-			s.buffer = make([]byte, s.size)
+			s.buffer = make([]byte, s.Size)
 		}
 
 		end := s.buffer
@@ -113,27 +109,27 @@ func (s *binarySearcher) InsertRange(base []byte, num int) {
 		}
 	}
 
-	if need := (s.Len() - (endPos - startPos) + num) * s.size; cap(s.Data) < need {
+	if need := (s.Len() - (endPos - startPos) + num) * s.Size; cap(s.Data) < need {
 		data := make([]byte, need, need+(need>>3) /*= need * 1.125*/)
-		copy(data, s.Data[:startPos*s.size])
-		copy(data[(startPos+num)*s.size:], s.Data[endPos*s.size:])
+		copy(data, s.Data[:startPos*s.Size])
+		copy(data[(startPos+num)*s.Size:], s.Data[endPos*s.Size:])
 		s.Data = data
 	} else {
 		s.Data = s.Data[:need]
-		copy(s.Data[(startPos+num)*s.size:], s.Data[endPos*s.size:])
+		copy(s.Data[(startPos+num)*s.Size:], s.Data[endPos*s.Size:])
 	}
 
-	incr.IncrementBytes(base, s.Data[startPos*s.size:(startPos+num)*s.size])
+	incr.IncrementBytes(base, s.Data[startPos*s.Size:(startPos+num)*s.Size])
 }
 
 func (s *binarySearcher) RemoveRange(base []byte, num int) {
 	startPos := s.Index(base)
-	if startPos*s.size == len(s.Data) {
+	if startPos*s.Size == len(s.Data) {
 		return
 	}
 
 	if s.buffer == nil {
-		s.buffer = make([]byte, s.size)
+		s.buffer = make([]byte, s.Size)
 	}
 
 	end := s.buffer
@@ -148,7 +144,7 @@ func (s *binarySearcher) RemoveRange(base []byte, num int) {
 	}
 
 	if startPos != endPos {
-		s.Data = append(s.Data[:startPos*s.size], s.Data[endPos*s.size:]...)
+		s.Data = append(s.Data[:startPos*s.Size], s.Data[endPos*s.Size:]...)
 	}
 }
 

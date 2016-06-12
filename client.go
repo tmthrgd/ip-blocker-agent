@@ -227,7 +227,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		end := int(header.IP4.Base) + int(header.IP4.Len)
 		searcher := binarySearcher{
 			Data: c.data[header.IP4.Base:end:end],
-			size: net.IPv4len,
+			Size: net.IPv4len,
 		}
 
 		return searcher.Contains(ip), nil
@@ -238,7 +238,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 			end := int(header.IP6Route.Base) + int(header.IP6Route.Len)
 			searcher := binarySearcher{
 				Data: c.data[header.IP6Route.Base:end:end],
-				size: net.IPv6len / 2,
+				Size: net.IPv6len / 2,
 			}
 
 			if searcher.Contains(ip[:net.IPv6len/2]) {
@@ -253,7 +253,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		end := int(header.IP6.Base) + int(header.IP6.Len)
 		searcher := binarySearcher{
 			Data: c.data[header.IP6.Base:end:end],
-			size: net.IPv6len,
+			Size: net.IPv6len,
 		}
 
 		return searcher.Contains(ip), nil

@@ -15,12 +15,11 @@ import (
 func TestBinarySearcherSort(t *testing.T) {
 	var strings = [...]string{"Hel", "abc", "foo", "bar", "foo", "f00", "%*&", "^*&", "***"}
 
-	a := binarySearcher{size: len(strings[0])}
-	size := a.Size()
+	a := binarySearcher{Size: len(strings[0])}
 
-	a.Data = make([]byte, len(strings)*size)
+	a.Data = make([]byte, len(strings)*a.Size)
 	for i, x := range strings {
-		copy(a.Data[i*size:(i+1)*size], x)
+		copy(a.Data[i*a.Size:(i+1)*a.Size], x)
 	}
 
 	a.Sort()
@@ -31,12 +30,11 @@ func TestBinarySearcherSort(t *testing.T) {
 }
 
 func TestBinarySearcherSortRand(t *testing.T) {
-	a := binarySearcher{size: 16}
-	size := a.Size()
+	a := binarySearcher{Size: 16}
 
-	a.Data = make([]byte, 1000*size)
+	a.Data = make([]byte, 1000*a.Size)
 	for i := 0; i < 1000; i++ {
-		rand.Read(a.Data[i*size : (i+1)*size])
+		rand.Read(a.Data[i*a.Size : (i+1)*a.Size])
 	}
 
 	a.Sort()
@@ -63,7 +61,7 @@ func testSizePanic(fn func()) (didPanic bool) {
 func TestBinarySearcherSize(t *testing.T) {
 	var test [20]byte
 
-	a := binarySearcher{size: 16}
+	a := binarySearcher{Size: 16}
 
 	if !testSizePanic(func() {
 		a.Index(test[:])
@@ -115,7 +113,7 @@ func TestBinarySearcherSize(t *testing.T) {
 }
 
 func TestBinarySearcherInsert(t *testing.T) {
-	a := binarySearcher{size: 4}
+	a := binarySearcher{Size: 4}
 
 	var x [4]byte
 	for i := 0; i < 1000; i++ {
@@ -158,7 +156,7 @@ func TestBinarySearcherInsert(t *testing.T) {
 }
 
 func TestBinarySearcherInsertRange(t *testing.T) {
-	a := binarySearcher{size: 4}
+	a := binarySearcher{Size: 4}
 
 	var x [4]byte
 	for i := 0; i < 79; i++ {
@@ -185,7 +183,7 @@ func TestBinarySearcherInsertRange(t *testing.T) {
 }
 
 func TestBinarySearcherRemoveRange(t *testing.T) {
-	a := binarySearcher{size: 4}
+	a := binarySearcher{Size: 4}
 
 	var x [4]byte
 	for i := 0; i < 157; i++ {
@@ -247,7 +245,7 @@ func TestBinarySearcherRemoveRange(t *testing.T) {
 }
 
 func TestBinarySearcherRemove(t *testing.T) {
-	a := binarySearcher{size: 4}
+	a := binarySearcher{Size: 4}
 
 	var x [4]byte
 	for i := 0; i < 21; i++ {

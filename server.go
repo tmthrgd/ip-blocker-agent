@@ -104,9 +104,9 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	return &Server{
 		file: file,
 
-		ip4s:  binarySearcher{size: net.IPv4len},
-		ip6s:  binarySearcher{size: net.IPv6len},
-		ip6rs: binarySearcher{size: net.IPv6len / 2},
+		ip4s:  binarySearcher{Size: net.IPv4len},
+		ip6s:  binarySearcher{Size: net.IPv6len},
+		ip6rs: binarySearcher{Size: net.IPv6len / 2},
 
 		data: data,
 		end:  end,
@@ -284,7 +284,7 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 	} else if ip6 := masked.To16(); ip6 != nil {
 		ip = ip6
 
-		if ones, _ := ipnet.Mask.Size(); ones <= s.ip6rs.Size()*8 {
+		if ones, _ := ipnet.Mask.Size(); ones <= s.ip6rs.Size*8 {
 			ips = &s.ip6rs
 		} else {
 			ips = &s.ip6s
@@ -298,7 +298,7 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		return nil
 	}
 
-	base := ip[:ips.Size()]
+	base := ip[:ips.Size]
 	ones, _ := ipnet.Mask.Size()
 	ones = len(base)*8 - ones
 
