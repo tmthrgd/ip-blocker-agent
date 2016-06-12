@@ -34,7 +34,7 @@ func TestEqual(t *testing.T) {
 			rand.Read(base)
 			args[0] = reflect.ValueOf(base)
 
-			args[1] = reflect.ValueOf(rand.Intn(1 + 4096/len(base)) * len(base))
+			args[1] = reflect.ValueOf(rand.Intn(1+4096/len(base)) * len(base))
 		},
 	}); err != nil {
 		t.Error(err)

@@ -9,8 +9,10 @@ package incr
 
 //go:noescape
 func incrementBytes4Asm(*byte, *byte, uint64)
+
 //go:noescape
 func incrementBytes8Asm(*byte, *byte, uint64)
+
 //go:noescape
 func incrementBytes16Asm(*byte, *byte, uint64)
 
