@@ -33,6 +33,8 @@ ip-blocker-agent has one subcommand:
 +2001:db8::/32 add IPv6 route range.*  
 -ip[/block] does the inverse of the above operations and removes the IP address(es).  
 ! clears all IP addresses.  
+s/path/to/file saves the blocklist to the specified path.  
+l/path/to/file loads the blocklist from the specified path.  
 b starts batching and will withhold all updates until batching is ended.  
 B ends batching.  
 q quits the program.
