@@ -405,10 +405,6 @@ func (s *Server) Load(r io.Reader) error {
 
 	s.ip4s.Data, s.ip6s.Data, s.ip6rs.Data = b.IP4, b.IP6, b.IP6Route
 
-	s.ip4s.Sort()
-	s.ip6s.Sort()
-	s.ip6rs.Sort()
-
 	if s.batching {
 		return nil
 	}
