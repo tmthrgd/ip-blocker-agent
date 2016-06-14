@@ -356,8 +356,7 @@ loop_from_x0x1:
 	PEXTRQ $1, X1, DX
 
 	ADDQ $1, AX
-	SETCS BX
-	ADDQ BX, DX
+	ADCQ $0, DX
 	BSWAPQ DX
 	BSWAPQ AX
 
