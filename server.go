@@ -6,14 +6,13 @@
 package blocker
 
 import (
-	"encoding/gob"
+	"encoding/binary"
 	"io"
 	"net"
 	"os"
 	"sync"
 	"sync/atomic"
 
-	"github.com/tmthrgd/ip-blocker-agent/internal/types"
 	"golang.org/x/sys/unix"
 )
 
@@ -356,6 +355,8 @@ func (s *Server) RemoveRange(ip net.IP, ipnet *net.IPNet) error {
 	return s.doInsertRemoveRange(ip, ipnet, false)
 }
 
+const serializedHeader = "ip-blocker-agent-v1\x00\xb1\x0c\x11\x57"
+
 // Save serializes the blocklist into w.
 //
 // The server can be recreated later with Load.
@@ -367,11 +368,35 @@ func (s *Server) Save(w io.Writer) error {
 		return ErrClosed
 	}
 
-	return gob.NewEncoder(w).Encode(&types.IPBlockerAgent{
-		IP4:      s.ip4s.Data,
-		IP6:      s.ip6s.Data,
-		IP6Route: s.ip6rs.Data,
-	})
+	if _, err := io.WriteString(w, serializedHeader); err != nil {
+		return err
+	}
+
+	if err := binary.Write(w, binary.BigEndian, uint64(len(s.ip4s.Data))); err != nil {
+		return err
+	}
+
+	if err := binary.Write(w, binary.BigEndian, uint64(len(s.ip6s.Data))); err != nil {
+		return err
+	}
+
+	if err := binary.Write(w, binary.BigEndian, uint64(len(s.ip6rs.Data))); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(s.ip4s.Data); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(s.ip6s.Data); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(s.ip6rs.Data); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Load loads the serialised blocklist in r into s.
@@ -393,17 +418,49 @@ func (s *Server) Load(r io.Reader) error {
 		return ErrNotEmpty
 	}
 
-	var b types.IPBlockerAgent
+	var header [len(serializedHeader)]byte
 
-	if err := gob.NewDecoder(r).Decode(&b); err != nil {
-		return InvalidDataError{err}
+	if _, err := io.ReadFull(r, header[:]); err != nil {
+		return err
 	}
 
-	if len(b.IP4)%4 != 0 || len(b.IP6)%16 != 0 || len(b.IP6Route)%8 != 0 {
-		return InvalidDataError{}
+	if string(header[:]) != serializedHeader {
+		return InvalidDataError{errInvalidHeader}
 	}
 
-	s.ip4s.Data, s.ip6s.Data, s.ip6rs.Data = b.IP4, b.IP6, b.IP6Route
+	var l4, l6, l6r uint64
+
+	if err := binary.Read(r, binary.BigEndian, &l4); err != nil {
+		return err
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &l6); err != nil {
+		return err
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &l6r); err != nil {
+		return err
+	}
+
+	if l4%4 != 0 || l6%16 != 0 || l6r%8 != 0 {
+		return InvalidDataError{errInvalidHeader}
+	}
+
+	s.ip4s.Data = make([]byte, l4)
+	s.ip6s.Data = make([]byte, l6)
+	s.ip6rs.Data = make([]byte, l6r)
+
+	if _, err := io.ReadFull(r, s.ip4s.Data); err != nil {
+		return err
+	}
+
+	if _, err := io.ReadFull(r, s.ip6s.Data); err != nil {
+		return err
+	}
+
+	if _, err := io.ReadFull(r, s.ip6rs.Data); err != nil {
+		return err
+	}
 
 	if s.batching {
 		return nil

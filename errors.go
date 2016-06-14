@@ -32,6 +32,8 @@ var (
 	ErrNotEmpty = errors.New("not empty")
 
 	errRangeTooLarge = errors.New("range too large")
+
+	errInvalidHeader = errors.New("invalid header")
 )
 
 // InvalidDataError will be returned by (*Server).Load() if the reader
