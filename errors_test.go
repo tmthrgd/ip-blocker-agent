@@ -10,6 +10,18 @@ import (
 	"testing"
 )
 
+func TestInvalidDataError(t *testing.T) {
+	err := InvalidDataError{nil}
+	if err.Error() != "invalid data" {
+		t.Error("invalid error message")
+	}
+
+	err = InvalidDataError{errors.New("test error")}
+	if err.Error() != "invalid data: test error" {
+		t.Error("invalid error message")
+	}
+}
+
 func TestLockReleaseFailedError(t *testing.T) {
 	err := LockReleaseFailedError{nil}
 	if err.Error() != "failed to release read lock" {

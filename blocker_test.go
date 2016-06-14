@@ -1424,6 +1424,16 @@ func TestClosedErrors(t *testing.T) {
 	if _, _, _, err = client.Count(); err != ErrClosed {
 		t.Errorf("(*Client).Count did not return ErrClosed on closed, got %v", err)
 	}
+
+	var b bytes.Buffer
+
+	if err = server.Save(&b); err != ErrClosed {
+		t.Errorf("(*Server).Save did not return ErrClosed on closed, got %v", err)
+	}
+
+	if err = server.Load(&b); err != ErrClosed {
+		t.Errorf("(*Server).Load did not return ErrClosed on closed, got %v", err)
+	}
 }
 
 func TestInvalidAddr(t *testing.T) {
@@ -1858,6 +1868,145 @@ func TestInsertRangeMassive(t *testing.T) {
 	}
 }
 
+func TestLoadSave(t *testing.T) {
+	t.Parallel()
+
+	server1, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server1.Unlink()
+	defer server1.Close()
+
+	server2, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server2.Unlink()
+	defer server2.Close()
+
+	if err = server1.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server2.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	extraIP := make(net.IP, net.IPv6len)
+
+	for i := 0; i < 10000; i++ {
+		rand.Read(extraIP)
+
+		if err = server1.Insert(extraIP[:net.IPv4len]); err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.Insert(extraIP); err != nil {
+			t.Error(err)
+		}
+
+		if err = server1.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			t.Error(err)
+		}
+	}
+
+	var b bytes.Buffer
+
+	if err = server1.Save(&b); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = server2.Load(&b); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(server1.ip4s.Data, server2.ip4s.Data) {
+		t.Errorf("ip4 data differs after Load, Save")
+	}
+
+	if !bytes.Equal(server1.ip6s.Data, server2.ip6s.Data) {
+		t.Errorf("ip6 data differs after Load, Save")
+	}
+
+	if !bytes.Equal(server1.ip6rs.Data, server2.ip6rs.Data) {
+		t.Errorf("ip6 route data differs after Load, Save")
+	}
+}
+
+func TestLoadNonEmptyError(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	var b bytes.Buffer
+
+	if err = server.Save(&b); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Load(&b); err != ErrNotEmpty {
+		t.Errorf("(*Server).Load did not return ErrNotEmpty on closed, got %v", err)
+	}
+}
+
+func TestLoadNotBatching(t *testing.T) {
+	t.Parallel()
+
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
+		t.Error(err)
+	}
+
+	var b bytes.Buffer
+
+	if err = server.Save(&b); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Clear(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Commit(); err != nil {
+		t.Error(err)
+	}
+
+	if err = server.Load(&b); err != nil {
+		t.Error(err)
+	}
+}
+
 func BenchmarkNew(b *testing.B) {
 	name := fmt.Sprintf("/go-test-%d", nameRand.Int())
 
@@ -2289,4 +2438,126 @@ func BenchmarkRemoveRangeIP6116(b *testing.B) {
 
 func BenchmarkRemoveRangeIP6Route52(b *testing.B) {
 	benchmarkInsertRemoveRange(b, false, "2001:db8::/52", 10000)
+}
+
+func benchmarkSave(b *testing.B, extra int) {
+	server, _, err := setup(false)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		b.Error(err)
+	}
+
+	extraIP := make(net.IP, net.IPv6len)
+
+	for i := 0; i < extra; i++ {
+		rand.Read(extraIP)
+
+		if err = server.Insert(extraIP[:net.IPv4len]); err != nil {
+			b.Error(err)
+		}
+
+		if err = server.Insert(extraIP); err != nil {
+			b.Error(err)
+		}
+
+		if err = server.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			b.Error(err)
+		}
+	}
+
+	b.ResetTimer()
+
+	var buf bytes.Buffer
+
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+
+		if err = server.Save(&buf); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkSaveEmpty(b *testing.B) {
+	benchmarkSave(b, 0)
+}
+
+func BenchmarkSave(b *testing.B) {
+	benchmarkSave(b, 10000/3)
+}
+
+func benchmarkLoad(b *testing.B, extra int) {
+	server, _, err := setup(false)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	if err = server.Batch(); err != nil {
+		b.Error(err)
+	}
+
+	extraIP := make(net.IP, net.IPv6len)
+
+	for i := 0; i < extra; i++ {
+		rand.Read(extraIP)
+
+		if err = server.Insert(extraIP[:net.IPv4len]); err != nil {
+			b.Error(err)
+		}
+
+		if err = server.Insert(extraIP); err != nil {
+			b.Error(err)
+		}
+
+		if err = server.InsertRange(extraIP, &net.IPNet{
+			IP:   extraIP,
+			Mask: net.CIDRMask(64, 128),
+		}); err != nil {
+			b.Error(err)
+		}
+	}
+
+	var buf bytes.Buffer
+
+	if err = server.Save(&buf); err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+
+		if err = server.Clear(); err != nil {
+			b.Fatal(err)
+		}
+
+		b.StartTimer()
+
+		buf2 := buf
+
+		if err = server.Load(&buf2); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkLoadEmpty(b *testing.B) {
+	benchmarkLoad(b, 0)
+}
+
+func BenchmarkLoad(b *testing.B) {
+	benchmarkLoad(b, 10000/3)
 }

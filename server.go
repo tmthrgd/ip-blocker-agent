@@ -6,11 +6,14 @@
 package blocker
 
 import (
+	"encoding/gob"
+	"io"
 	"net"
 	"os"
 	"sync"
 	"sync/atomic"
 
+	"github.com/tmthrgd/ip-blocker-agent/internal/types"
 	"golang.org/x/sys/unix"
 )
 
@@ -351,6 +354,66 @@ func (s *Server) InsertRange(ip net.IP, ipnet *net.IPNet) error {
 // Will fail if Closed() has already been called.
 func (s *Server) RemoveRange(ip net.IP, ipnet *net.IPNet) error {
 	return s.doInsertRemoveRange(ip, ipnet, false)
+}
+
+// Save serializes the blocklist into w.
+//
+// The server can be recreated later with Load.
+func (s *Server) Save(w io.Writer) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return ErrClosed
+	}
+
+	return gob.NewEncoder(w).Encode(&types.IPBlockerAgent{
+		IP4:      s.ip4s.Data,
+		IP6:      s.ip6s.Data,
+		IP6Route: s.ip6rs.Data,
+	})
+}
+
+// Load loads the serialised blocklist in r into s.
+//
+// If presently batching, Load() will not commit the
+// changes to shared memory.
+//
+// It will fail if the current blocklist is not empty
+// or r contains invalid data.
+func (s *Server) Load(r io.Reader) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return ErrClosed
+	}
+
+	if len(s.ip4s.Data) != 0 || len(s.ip6s.Data) != 0 || len(s.ip6rs.Data) != 0 {
+		return ErrNotEmpty
+	}
+
+	var b types.IPBlockerAgent
+
+	if err := gob.NewDecoder(r).Decode(&b); err != nil {
+		return InvalidDataError{err}
+	}
+
+	if len(b.IP4)%4 != 0 || len(b.IP6)%16 != 0 || len(b.IP6Route)%8 != 0 {
+		return InvalidDataError{}
+	}
+
+	s.ip4s.Data, s.ip6s.Data, s.ip6rs.Data = b.IP4, b.IP6, b.IP6Route
+
+	s.ip4s.Sort()
+	s.ip6s.Sort()
+	s.ip6rs.Sort()
+
+	if s.batching {
+		return nil
+	}
+
+	return s.commit()
 }
 
 // Clear removes all IP addresses and ranges from the

@@ -27,8 +27,26 @@ var (
 	// the time of the call.
 	ErrInvalidSharedMemory = errors.New("invalid shared memory")
 
+	// ErrNotEmpty will be returned by (*Server).Load() if the
+	// blocklist was not empty before the call.
+	ErrNotEmpty = errors.New("not empty")
+
 	errRangeTooLarge = errors.New("range too large")
 )
+
+// InvalidDataError will be returned by (*Server).Load() if the reader
+// contains invalid data.
+type InvalidDataError struct {
+	Err error
+}
+
+func (e InvalidDataError) Error() string {
+	if e.Err == nil {
+		return "invalid data"
+	}
+
+	return "invalid data: " + e.Err.Error()
+}
 
 // LockReleaseFailedError records that a lock could not
 // be released and any error that was occuring.

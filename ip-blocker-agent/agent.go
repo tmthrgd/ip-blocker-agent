@@ -203,6 +203,58 @@ func main() {
 			}
 
 			fmt.Printf("invalid input: %s\n", line)
+		case 's':
+			fallthrough
+		case 'S':
+			if len(line) <= 1 {
+				fmt.Printf("invalid input: %s\n", line)
+				continue
+			}
+
+			f, err := os.Create(os.ExpandEnv(line[1:]))
+			if err != nil {
+				panic(err)
+			}
+
+			err = server.Save(f)
+			f.Close()
+
+			if err != nil {
+				panic(err)
+			}
+		case 'l':
+			fallthrough
+		case 'L':
+			if len(line) <= 1 {
+				fmt.Printf("invalid input: %s\n", line)
+				continue
+			}
+
+			f, err := os.Open(os.ExpandEnv(line[1:]))
+			if err != nil {
+				if os.IsNotExist(err) {
+					fmt.Println(err)
+					continue
+				}
+
+				panic(err)
+			}
+
+			err = server.Load(f)
+			f.Close()
+
+			if err != nil {
+				if _, ok := err.(blocker.InvalidDataError); ok || err == blocker.ErrNotEmpty {
+					fmt.Println(err)
+					continue
+				}
+
+				panic(err)
+			}
+
+			if !server.IsBatching() {
+				printServer(server)
+			}
 		default:
 			fmt.Printf("invalid operation: %c\n", line[0])
 		}
