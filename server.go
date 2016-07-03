@@ -87,7 +87,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	data, err := unix.Mmap(int(file.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := unix.Mmap(int(file.Fd()), 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	data, err := unix.Mmap(int(s.file.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := unix.Mmap(int(s.file.Fd()), 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	data, err = unix.Mmap(int(s.file.Fd()), 0, int(size2), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err = unix.Mmap(int(s.file.Fd()), 0, size2, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return err
 	}
