@@ -112,8 +112,19 @@ func (c *Client) remap(force bool) (err error) {
 	if !force {
 		c.mu.RUnlock()
 		c.mu.Lock()
-		defer c.mu.RLock()
-		defer c.mu.Unlock()
+		defer func() {
+			c.mu.Unlock()
+			c.mu.RLock()
+
+			if err != nil {
+				return
+			}
+
+			header := castToHeader(&c.data[0])
+			if c.revision != uint32(header.Revision) {
+				err = c.remap(false)
+			}
+		}()
 
 		if c.closed {
 			return ErrClosed
