@@ -27,10 +27,6 @@ var (
 	// the time of the call.
 	ErrInvalidSharedMemory = errors.New("invalid shared memory")
 
-	// ErrNotEmpty will be returned by (*Server).Load() if the
-	// blocklist was not empty before the call.
-	ErrNotEmpty = errors.New("not empty")
-
 	errRangeTooLarge = errors.New("range too large")
 
 	errInvalidHeader = errors.New("invalid header")

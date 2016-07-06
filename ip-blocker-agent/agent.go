@@ -244,7 +244,7 @@ func main() {
 			f.Close()
 
 			if err != nil {
-				if _, ok := err.(blocker.InvalidDataError); ok || err == blocker.ErrNotEmpty {
+				if _, ok := err.(blocker.InvalidDataError); ok {
 					fmt.Println(err)
 					continue
 				}

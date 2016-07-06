@@ -1501,34 +1501,6 @@ func TestLoadSave(t *testing.T) {
 	}
 }
 
-func TestLoadNonEmptyError(t *testing.T) {
-	server, _, err := setup(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-
-	if err = server.Batch(); err != nil {
-		t.Error(err)
-	}
-
-	if err = server.Insert(net.ParseIP("192.0.2.0")); err != nil {
-		t.Error(err)
-	}
-
-	var b bytes.Buffer
-
-	if err = server.Save(&b); err != nil {
-		t.Error(err)
-	}
-
-	if err = server.Load(&b); err != ErrNotEmpty {
-		t.Errorf("(*Server).Load did not return ErrNotEmpty on closed, got %v", err)
-	}
-}
-
 func TestLoadNotBatching(t *testing.T) {
 	server, _, err := setup(false)
 	if err != nil {

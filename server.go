@@ -407,10 +407,6 @@ func (s *Server) Load(r io.Reader) error {
 		return ErrClosed
 	}
 
-	if len(s.ip4s.Data) != 0 || len(s.ip6s.Data) != 0 || len(s.ip6rs.Data) != 0 {
-		return ErrNotEmpty
-	}
-
 	var header [len(serializedHeader)]byte
 
 	if _, err := io.ReadFull(r, header[:]); err != nil {
