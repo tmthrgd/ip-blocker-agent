@@ -92,7 +92,7 @@ func TestAddition(t *testing.T) {
 			rand.Read(x)
 			args[0] = reflect.ValueOf(x)
 
-			args[1] = reflect.ValueOf(rand.Int() & int(^uint32(0)))
+			args[1] = reflect.ValueOf(rand.Int() & int(^uint32(0)>>1))
 		},
 	}); err != nil {
 		t.Error(err)
