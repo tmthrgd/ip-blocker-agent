@@ -1675,11 +1675,11 @@ func BenchmarkInsertIP6NoSearch(b *testing.B) {
 }
 
 func BenchmarkInsertIP4(b *testing.B) {
-	benchmarkInsert(b, "192.0.2.0", 10000)
+	benchmarkInsert(b, "192.0.2.0", 100000)
 }
 
 func BenchmarkInsertIP6(b *testing.B) {
-	benchmarkInsert(b, "2001:db8::", 10000)
+	benchmarkInsert(b, "2001:db8::", 100000)
 }
 
 func benchmarkRemove(b *testing.B, addr string, extra int) {
@@ -1736,11 +1736,11 @@ func BenchmarkRemoveIP6NoSearch(b *testing.B) {
 }
 
 func BenchmarkRemoveIP4(b *testing.B) {
-	benchmarkRemove(b, "192.0.2.0", 10000)
+	benchmarkRemove(b, "192.0.2.0", 100000)
 }
 
 func BenchmarkRemoveIP6(b *testing.B) {
-	benchmarkRemove(b, "2001:db8::", 10000)
+	benchmarkRemove(b, "2001:db8::", 100000)
 }
 
 func benchmarkContains(b *testing.B, addr string, extra int) {
@@ -1803,11 +1803,11 @@ func BenchmarkContainsIP6NoSearch(b *testing.B) {
 }
 
 func BenchmarkContainsIP4(b *testing.B) {
-	benchmarkContains(b, "192.0.2.0", 10000)
+	benchmarkContains(b, "192.0.2.0", 100000)
 }
 
 func BenchmarkContainsIP6(b *testing.B) {
-	benchmarkContains(b, "2001:db8::", 10000)
+	benchmarkContains(b, "2001:db8::", 100000)
 }
 
 func benchmarkCommit(b *testing.B, extra int) {
@@ -1866,7 +1866,7 @@ func BenchmarkCommitEmpty(b *testing.B) {
 }
 
 func BenchmarkCommit(b *testing.B) {
-	benchmarkCommit(b, 10000/3)
+	benchmarkCommit(b, 100000/3)
 }
 
 func BenchmarkClientRemap(b *testing.B) {
@@ -1987,19 +1987,19 @@ func BenchmarkInsertRangeIP6RouteNoSearch52(b *testing.B) {
 }
 
 func BenchmarkInsertRangeIP420(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "192.0.2.0/20", 10000)
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/20", 100000)
 }
 
 func BenchmarkInsertRangeIP48(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "192.0.2.0/8", 10000)
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/8", 100000)
 }
 
 func BenchmarkInsertRangeIP6116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 10000)
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 100000)
 }
 
 func BenchmarkInsertRangeIP6Route52(b *testing.B) {
-	benchmarkInsertRemoveRange(b, true, "2001:db8::/52", 10000)
+	benchmarkInsertRemoveRange(b, true, "2001:db8::/52", 100000)
 }
 
 func BenchmarkRemoveRangeIP4NoSearch20(b *testing.B) {
@@ -2019,19 +2019,19 @@ func BenchmarkRemoveRangeIP6RouteNoSearch52(b *testing.B) {
 }
 
 func BenchmarkRemoveRangeIP420(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "192.0.2.0/20", 10000)
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/20", 100000)
 }
 
 func BenchmarkRemoveRangeIP48(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "192.0.2.0/8", 10000)
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/8", 100000)
 }
 
 func BenchmarkRemoveRangeIP6116(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 10000)
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 100000)
 }
 
 func BenchmarkRemoveRangeIP6Route52(b *testing.B) {
-	benchmarkInsertRemoveRange(b, false, "2001:db8::/52", 10000)
+	benchmarkInsertRemoveRange(b, false, "2001:db8::/52", 100000)
 }
 
 func benchmarkSave(b *testing.B, extra int) {
@@ -2086,7 +2086,7 @@ func BenchmarkSaveEmpty(b *testing.B) {
 }
 
 func BenchmarkSave(b *testing.B) {
-	benchmarkSave(b, 10000/3)
+	benchmarkSave(b, 100000/3)
 }
 
 func benchmarkLoad(b *testing.B, extra int) {
@@ -2153,5 +2153,5 @@ func BenchmarkLoadEmpty(b *testing.B) {
 }
 
 func BenchmarkLoad(b *testing.B) {
-	benchmarkLoad(b, 10000/3)
+	benchmarkLoad(b, 100000/3)
 }
