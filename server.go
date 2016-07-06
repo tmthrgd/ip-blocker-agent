@@ -513,6 +513,10 @@ func (s *Server) Batch() error {
 func (s *Server) close() error {
 	s.closed = true
 
+	s.ip4s.Clear()
+	s.ip6s.Clear()
+	s.ip6rs.Clear()
+
 	if err := unix.Munmap(s.data); err != nil {
 		return err
 	}
