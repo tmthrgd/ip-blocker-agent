@@ -1974,6 +1974,10 @@ func BenchmarkInsertRangeIP4NoSearch20(b *testing.B) {
 	benchmarkInsertRemoveRange(b, true, "192.0.2.0/20", 0)
 }
 
+func BenchmarkInsertRangeIP4NoSearch8(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/8", 0)
+}
+
 func BenchmarkInsertRangeIP6NoSearch116(b *testing.B) {
 	benchmarkInsertRemoveRange(b, true, "2001:db8::/116", 0)
 }
@@ -1984,6 +1988,10 @@ func BenchmarkInsertRangeIP6RouteNoSearch52(b *testing.B) {
 
 func BenchmarkInsertRangeIP420(b *testing.B) {
 	benchmarkInsertRemoveRange(b, true, "192.0.2.0/20", 10000)
+}
+
+func BenchmarkInsertRangeIP48(b *testing.B) {
+	benchmarkInsertRemoveRange(b, true, "192.0.2.0/8", 10000)
 }
 
 func BenchmarkInsertRangeIP6116(b *testing.B) {
@@ -1998,6 +2006,10 @@ func BenchmarkRemoveRangeIP4NoSearch20(b *testing.B) {
 	benchmarkInsertRemoveRange(b, false, "192.0.2.0/20", 0)
 }
 
+func BenchmarkRemoveRangeIP4NoSearch8(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/8", 0)
+}
+
 func BenchmarkRemoveRangeIP6NoSearch116(b *testing.B) {
 	benchmarkInsertRemoveRange(b, false, "2001:db8::/116", 0)
 }
@@ -2008,6 +2020,10 @@ func BenchmarkRemoveRangeIP6RouteNoSearch52(b *testing.B) {
 
 func BenchmarkRemoveRangeIP420(b *testing.B) {
 	benchmarkInsertRemoveRange(b, false, "192.0.2.0/20", 10000)
+}
+
+func BenchmarkRemoveRangeIP48(b *testing.B) {
+	benchmarkInsertRemoveRange(b, false, "192.0.2.0/8", 10000)
 }
 
 func BenchmarkRemoveRangeIP6116(b *testing.B) {
