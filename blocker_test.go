@@ -77,29 +77,49 @@ func testAddress(t *testing.T, addrs ...string) {
 		if has {
 			t.Error("blocklist contains entry before any added")
 		}
+	}
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, addr := range addrs {
 		if err = server.Insert(net.ParseIP(addr)); err != nil {
 			t.Error(err)
-			continue
 		}
+	}
 
-		has, err = client.Contains(net.ParseIP(addr))
+	if err = server.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, addr := range addrs {
+		has, err := client.Contains(net.ParseIP(addr))
 		if err != nil {
 			t.Error(err)
-			continue
 		}
 
 		if !has {
 			t.Error("blocklist does not contain entry after insert")
-			continue
 		}
+	}
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, addr := range addrs {
 		if err = server.Remove(net.ParseIP(addr)); err != nil {
 			t.Error(err)
-			continue
 		}
+	}
 
-		has, err = client.Contains(net.ParseIP(addr))
+	if err = server.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, addr := range addrs {
+		has, err := client.Contains(net.ParseIP(addr))
 		if err != nil {
 			t.Error(err)
 		}
@@ -143,6 +163,10 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 		}
 	}
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
@@ -152,6 +176,10 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 		if err = server.InsertRange(ip, ipnet); err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	if err = server.Commit(); err != nil {
+		t.Fatal(err)
 	}
 
 	for _, addr := range addrs {
@@ -166,6 +194,10 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 		}
 	}
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, iprange := range ipranges {
 		ip, ipnet, err := net.ParseCIDR(iprange)
 		if err != nil {
@@ -175,6 +207,10 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 		if err = server.RemoveRange(ip, ipnet); err != nil {
 			t.Fatal(err)
 		}
+	}
+
+	if err = server.Commit(); err != nil {
+		t.Fatal(err)
 	}
 
 	for _, addr := range addrs {
@@ -190,9 +226,6 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 }
 
 func TestIP4Range(t *testing.T) {
-	testRange(t, []string{"192.0.2.0/24"}, "192.0.2.0", "192.0.2.1")
-	testRange(t, []string{"198.51.100.0/24"}, "198.51.100.0", "198.51.100.128")
-	testRange(t, []string{"203.0.113.0/24"}, "203.0.113.0", "203.0.113.255")
 	testRange(t, []string{"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24"}, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.128", "203.0.113.0", "203.0.113.255")
 }
 
@@ -201,7 +234,6 @@ func TestIP6Range(t *testing.T) {
 }
 
 func TestIP6RouteRange(t *testing.T) {
-	testRange(t, []string{"2001:db8::/64"}, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 	testRange(t, []string{"2001:db8::/58"}, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
@@ -219,32 +251,21 @@ func testClear(t *testing.T, addrs ...string) {
 	defer server.Close()
 	defer client.Close()
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, addr := range addrs {
-		has, err := client.Contains(net.ParseIP(addr))
-		if err != nil {
-			t.Error(err)
-		}
-
-		if has {
-			t.Error("blocklist contains entry before any added")
-		}
-
 		if err = server.Insert(net.ParseIP(addr)); err != nil {
 			t.Error(err)
-			continue
-		}
-
-		has, err = client.Contains(net.ParseIP(addr))
-		if err != nil {
-			t.Error(err)
-		}
-
-		if !has {
-			t.Error("blocklist does not contain entry after insert")
 		}
 	}
 
 	if err = server.Clear(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = server.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -765,6 +786,10 @@ func TestInsertRangeWithLastAlready(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
 	if err = server.Insert(net.ParseIP("192.0.2.253")); err != nil {
 		t.Error(err)
 	}
@@ -786,6 +811,10 @@ func TestInsertRangeWithLastAlready(t *testing.T) {
 		t.Error(err)
 	}
 
+	if err = server.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
 	ip4, ip6, ip6r, err := server.Count()
 	if err != nil {
 		t.Error(err)
@@ -805,6 +834,10 @@ func TestRemoveRangeNonExistAtEnd(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
+	if err = server.Batch(); err != nil {
+		t.Fatal(err)
+	}
+
 	if err = server.Insert(net.ParseIP("192.0.1.0")); err != nil {
 		t.Error(err)
 	}
@@ -816,6 +849,10 @@ func TestRemoveRangeNonExistAtEnd(t *testing.T) {
 
 	if err = server.RemoveRange(ip, ipnet); err != nil {
 		t.Error(err)
+	}
+
+	if err = server.Commit(); err != nil {
+		t.Fatal(err)
 	}
 
 	ip4, ip6, ip6r, err := server.Count()
