@@ -1749,6 +1749,10 @@ func benchmarkContains(b *testing.B, addr string, extra int) {
 		panic("failed to parse " + addr)
 	}
 
+	if err = server.Batch(); err != nil {
+		b.Error(err)
+	}
+
 	if err = server.Insert(ip); err != nil {
 		b.Error(err)
 	}
@@ -1761,6 +1765,10 @@ func benchmarkContains(b *testing.B, addr string, extra int) {
 		if err = server.Insert(extraIP); err != nil {
 			b.Error(err)
 		}
+	}
+
+	if err = server.Commit(); err != nil {
+		b.Error(err)
 	}
 
 	b.ResetTimer()
@@ -1804,6 +1812,10 @@ func benchmarkCommit(b *testing.B, extra int) {
 
 	extraIP := make(net.IP, net.IPv6len)
 
+	if err = server.Batch(); err != nil {
+		b.Fatal(err)
+	}
+
 	for i := 0; i < extra; i++ {
 		rand.Read(extraIP)
 
@@ -1826,18 +1838,17 @@ func benchmarkCommit(b *testing.B, extra int) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+		if err = server.Commit(); err != nil {
+			b.Error(err)
+		}
+
 		b.StopTimer()
 
 		if err = server.Batch(); err != nil {
 			b.Error(err)
-			continue
 		}
 
 		b.StartTimer()
-
-		if err = server.Commit(); err != nil {
-			b.Error(err)
-		}
 	}
 }
 
