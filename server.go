@@ -66,8 +66,6 @@ type Server struct {
 
 	closed   bool
 	batching bool
-
-	doInsertRemoveRangeHook func(insert bool, ip net.IP, ipnet *net.IPNet, ips *binarySearcher) // for testing
 }
 
 // New creates a new IP blocker shared memory server
@@ -293,11 +291,6 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		}
 	} else {
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
-	}
-
-	if s.doInsertRemoveRangeHook != nil {
-		s.doInsertRemoveRangeHook(insert, ip, ipnet, ips)
-		return nil
 	}
 
 	base := ip[:ips.Size]
