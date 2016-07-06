@@ -84,6 +84,9 @@ func benchmarkGo(b *testing.B, k, l int) {
 	base := make([]byte, k)
 	dest := make([]byte, l)
 
+	b.SetBytes(int64(l))
+	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		incrementBytesFallback(base, dest)
 	}
@@ -204,6 +207,9 @@ func Benchmark16Go65536(b *testing.B) {
 func benchmark(b *testing.B, k, l int) {
 	base := make([]byte, k)
 	dest := make([]byte, l)
+
+	b.SetBytes(int64(l))
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		IncrementBytes(base, dest)
