@@ -47,8 +47,6 @@ const maxInt = int(^uint(0) >> 1)
 var maxIntBig = big.NewInt(int64(maxInt))
 
 func TestAddition(t *testing.T) {
-	t.Parallel()
-
 	bigIntZero := big.NewInt(0)
 
 	testAddition(t, big.NewInt(10000), 7321, 16)

@@ -111,20 +111,14 @@ func testAddress(t *testing.T, addrs ...string) {
 }
 
 func TestIP4(t *testing.T) {
-	t.Parallel()
-
 	testAddress(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1")
 }
 
 func TestIP6(t *testing.T) {
-	t.Parallel()
-
 	testAddress(t, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestMixed(t *testing.T) {
-	t.Parallel()
-
 	testAddress(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1", "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
@@ -196,8 +190,6 @@ func testRange(t *testing.T, ipranges []string, addrs ...string) {
 }
 
 func TestIP4Range(t *testing.T) {
-	t.Parallel()
-
 	testRange(t, []string{"192.0.2.0/24"}, "192.0.2.0", "192.0.2.1")
 	testRange(t, []string{"198.51.100.0/24"}, "198.51.100.0", "198.51.100.128")
 	testRange(t, []string{"203.0.113.0/24"}, "203.0.113.0", "203.0.113.255")
@@ -205,21 +197,15 @@ func TestIP4Range(t *testing.T) {
 }
 
 func TestIP6Range(t *testing.T) {
-	t.Parallel()
-
 	testRange(t, []string{"2001:db8::/112"}, "2001:db8::", "2001:db8::1", "2001:db8::f")
 }
 
 func TestIP6RouteRange(t *testing.T) {
-	t.Parallel()
-
 	testRange(t, []string{"2001:db8::/64"}, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 	testRange(t, []string{"2001:db8::/58"}, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestMixedRange(t *testing.T) {
-	t.Parallel()
-
 	testRange(t, []string{"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/112", "::/64", "1::/58"}, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.128", "203.0.113.0", "203.0.113.255", "2001:db8::", "2001:db8::1", "2001:db8::f", "::", "::1", "::f", "::dead:beef", "1::", "1::1", "1::f", "1::dead:beef")
 }
 
@@ -275,20 +261,14 @@ func testClear(t *testing.T, addrs ...string) {
 }
 
 func TestClearIP4(t *testing.T) {
-	t.Parallel()
-
 	testClear(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1")
 }
 
 func TestClearIP6(t *testing.T) {
-	t.Parallel()
-
 	testClear(t, "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
 func TestClearMixed(t *testing.T) {
-	t.Parallel()
-
 	testClear(t, "192.0.2.0", "192.0.2.1", "198.51.100.0", "198.51.100.1", "203.0.113.0", "203.0.113.1", "2001:db8::", "2001:db8::1", "2001:db8::f", "2001:db8::dead:beef")
 }
 
@@ -342,8 +322,6 @@ func TestClear2(t *testing.T) {
 }
 
 func TestBatch(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -404,8 +382,6 @@ func TestBatch(t *testing.T) {
 }
 
 func TestServerClose(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -424,8 +400,6 @@ func TestServerClose(t *testing.T) {
 }
 
 func TestClientClose(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -445,8 +419,6 @@ func TestClientClose(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -489,8 +461,6 @@ func TestUnlink(t *testing.T) {
 }
 
 func TestServerName(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -505,8 +475,6 @@ func TestServerName(t *testing.T) {
 }
 
 func TestClientName(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -526,8 +494,6 @@ func TestClientName(t *testing.T) {
 }
 
 func TestServerCount(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -703,8 +669,6 @@ func TestServerCount(t *testing.T) {
 }
 
 func TestClientCount(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -793,8 +757,6 @@ func TestClientCorrupted(t *testing.T) {
 }
 
 func TestInsertRangeWithLastAlready(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -835,8 +797,6 @@ func TestInsertRangeWithLastAlready(t *testing.T) {
 }
 
 func TestRemoveRangeNonExistAtEnd(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -869,8 +829,6 @@ func TestRemoveRangeNonExistAtEnd(t *testing.T) {
 }
 
 func TestAddLargeRange(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -899,8 +857,6 @@ func TestAddLargeRange(t *testing.T) {
 }
 
 func TestOpenNonExist(t *testing.T) {
-	t.Parallel()
-
 	client, err := Open("/go-test-bogus-name")
 	if err == nil {
 		client.Close()
@@ -912,8 +868,6 @@ func TestOpenNonExist(t *testing.T) {
 }
 
 func TestNewOpenEmptyName(t *testing.T) {
-	t.Parallel()
-
 	client, err := Open("")
 	if err == nil {
 		client.Close()
@@ -935,8 +889,6 @@ func TestNewOpenEmptyName(t *testing.T) {
 }
 
 func TestUnlinkEmptyName(t *testing.T) {
-	t.Parallel()
-
 	if _, ok := Unlink("").(*os.PathError); !ok {
 		t.Errorf("Unlink did not return *os.PathError for empty name")
 	}
@@ -952,8 +904,6 @@ func testPanic(fn func()) (didPanic bool) {
 }
 
 func TestClosedPanics(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -977,8 +927,6 @@ func TestClosedPanics(t *testing.T) {
 }
 
 func TestClosedErrors(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -1073,8 +1021,6 @@ func TestClosedErrors(t *testing.T) {
 }
 
 func TestInvalidAddr(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -1175,8 +1121,6 @@ func TestInvalidAddr(t *testing.T) {
 }
 
 func TestInvalidVersion(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1209,8 +1153,6 @@ func TestInvalidVersion(t *testing.T) {
 }
 
 func TestMemoryTooShort(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1234,8 +1176,6 @@ func TestMemoryTooShort(t *testing.T) {
 }
 
 func TestInvalidHeader(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1353,22 +1293,16 @@ func testChangeBeforeLock(t *testing.T, corrupter func(*shmHeader)) {
 }
 
 func TestChangeBeforeLock(t *testing.T) {
-	t.Parallel()
-
 	testChangeBeforeLock(t, nil)
 }
 
 func TestCorruptChangeBeforeLock(t *testing.T) {
-	t.Parallel()
-
 	testChangeBeforeLock(t, func(h *shmHeader) {
 		h.IP4.Base, h.IP4.Len = 0, 32
 	})
 }
 
 func TestCorruptContains(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -1394,8 +1328,6 @@ func TestCorruptContains(t *testing.T) {
 }
 
 func TestClientRemapAlreadyDone(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -1424,8 +1356,6 @@ func TestClientRemapAlreadyDone(t *testing.T) {
 }
 
 func TestClientRemapLockFailure(t *testing.T) {
-	t.Parallel()
-
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -1476,8 +1406,6 @@ func TestInsertRangeMassive(t *testing.T) {
 		t.Skip("INSERTMASSIVERANGETEST is not set to 1, 2 or 3")
 	}
 
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1505,8 +1433,6 @@ func TestInsertRangeMassive(t *testing.T) {
 }
 
 func TestLoadSave(t *testing.T) {
-	t.Parallel()
-
 	server1, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1576,8 +1502,6 @@ func TestLoadSave(t *testing.T) {
 }
 
 func TestLoadNonEmptyError(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1606,8 +1530,6 @@ func TestLoadNonEmptyError(t *testing.T) {
 }
 
 func TestLoadNotBatching(t *testing.T) {
-	t.Parallel()
-
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
