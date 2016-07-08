@@ -87,7 +87,7 @@ hugeloop:
 	JZ ret
 
 	CMPQ BX, $64
-	JGE hugeloop
+	JAE hugeloop
 
 	CMPQ BX, $16
 	JB loop_from_x0
@@ -104,7 +104,7 @@ bigloop:
 	JZ ret
 
 	CMPQ BX, $16
-	JGE bigloop
+	JAE bigloop
 
 loop_from_x0:
 	PEXTRD $3, X0, AX
@@ -204,7 +204,7 @@ hugeloop:
 	JZ ret
 
 	CMPQ BX, $64
-	JGE hugeloop
+	JAE hugeloop
 
 	CMPQ BX, $16
 	JB loop_from_x0
@@ -221,7 +221,7 @@ bigloop:
 	JZ ret
 
 	CMPQ BX, $16
-	JGE bigloop
+	JAE bigloop
 
 loop_from_x0:
 	PEXTRQ $1, X0, AX
@@ -349,7 +349,7 @@ bigloop:
 	JZ ret
 
 	CMPQ BX, $32
-	JGE bigloop
+	JAE bigloop
 
 loop_from_x0x1:
 	PEXTRQ $1, X0, AX
