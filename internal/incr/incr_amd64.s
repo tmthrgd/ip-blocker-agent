@@ -27,9 +27,9 @@ GLOBL avx4BEShuf<>(SB), RODATA, $16
 TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	MOVQ base+0(FP), AX
 	MOVQ data+8(FP), DI
-	MOVQ len+16(FP), CX
+	MOVQ len+16(FP), BX
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JB loop_from_ax
 
 	CMPB runtime·support_avx(SB), $1
@@ -48,13 +48,13 @@ TEXT ·incrementBytes4Asm(SB),NOSPLIT,$0
 	MOVUPS X1, 0(DI)
 
 	ADDQ $16, DI
-	SUBQ $16, CX
+	SUBQ $16, BX
 	JZ ret
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JB loop_from_x0
 
-	CMPQ CX, $64
+	CMPQ BX, $64
 	JB bigloop
 
 hugeloop:
@@ -83,13 +83,13 @@ hugeloop:
 	MOVUPS X1, 48(DI)
 
 	ADDQ $64, DI
-	SUBQ $64, CX
+	SUBQ $64, BX
 	JZ ret
 
-	CMPQ CX, $64
+	CMPQ BX, $64
 	JGE hugeloop
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JB loop_from_x0
 
 bigloop:
@@ -100,10 +100,10 @@ bigloop:
 	MOVUPS X1, 0(DI)
 
 	ADDQ $16, DI
-	SUBQ $16, CX
+	SUBQ $16, BX
 	JZ ret
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JGE bigloop
 
 loop_from_x0:
@@ -120,7 +120,7 @@ loop:
 	BSWAPL AX
 
 	ADDQ $4, DI
-	SUBQ $4, CX
+	SUBQ $4, BX
 	JNZ loop
 
 ret:
@@ -144,9 +144,9 @@ GLOBL avx8BEShuf<>(SB), RODATA, $16
 TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	MOVQ base+0(FP), AX
 	MOVQ data+8(FP), DI
-	MOVQ len+16(FP), CX
+	MOVQ len+16(FP), BX
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JB loop_from_ax
 
 	CMPB runtime·support_avx(SB), $1
@@ -165,13 +165,13 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	MOVUPS X1, 0(DI)
 
 	ADDQ $16, DI
-	SUBQ $16, CX
+	SUBQ $16, BX
 	JZ ret
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JB loop_from_x0
 
-	CMPQ CX, $64
+	CMPQ BX, $64
 	JB bigloop
 
 hugeloop:
@@ -200,13 +200,13 @@ hugeloop:
 	MOVUPS X1, 48(DI)
 
 	ADDQ $64, DI
-	SUBQ $64, CX
+	SUBQ $64, BX
 	JZ ret
 
-	CMPQ CX, $64
+	CMPQ BX, $64
 	JGE hugeloop
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JB loop_from_x0
 
 bigloop:
@@ -217,10 +217,10 @@ bigloop:
 	MOVUPS X1, 0(DI)
 
 	ADDQ $16, DI
-	SUBQ $16, CX
+	SUBQ $16, BX
 	JZ ret
 
-	CMPQ CX, $16
+	CMPQ BX, $16
 	JGE bigloop
 
 loop_from_x0:
@@ -237,7 +237,7 @@ loop:
 	BSWAPQ AX
 
 	ADDQ $8, DI
-	SUBQ $8, CX
+	SUBQ $8, BX
 	JNZ loop
 
 ret:
@@ -273,9 +273,9 @@ GLOBL avx16QOne<>(SB), RODATA, $32
 TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	MOVQ base+0(FP), AX
 	MOVQ data+8(FP), DI
-	MOVQ len+16(FP), CX
+	MOVQ len+16(FP), BX
 
-	CMPQ CX, $32
+	CMPQ BX, $32
 	JB loop_from_ax
 
 	CMPB runtime·support_avx(SB), $1
@@ -315,10 +315,10 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	MOVUPS X2, 16(DI)
 
 	ADDQ $32, DI
-	SUBQ $32, CX
+	SUBQ $32, BX
 	JZ ret
 
-	CMPQ CX, $32
+	CMPQ BX, $32
 	JB loop_from_x0x1
 
 bigloop:
@@ -345,10 +345,10 @@ bigloop:
 	MOVUPS X2, 16(DI)
 
 	ADDQ $32, DI
-	SUBQ $32, CX
+	SUBQ $32, BX
 	JZ ret
 
-	CMPQ CX, $32
+	CMPQ BX, $32
 	JGE bigloop
 
 loop_from_x0x1:
@@ -371,7 +371,7 @@ incremented_dx:
 	BSWAPQ AX
 
 	ADDQ $16, DI
-	SUBQ $16, CX
+	SUBQ $16, BX
 	JNZ loop
 
 ret:
