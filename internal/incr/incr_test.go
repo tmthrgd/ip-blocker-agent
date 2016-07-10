@@ -36,6 +36,8 @@ func TestEqual(t *testing.T) {
 
 			args[1] = reflect.ValueOf(rand.Intn(1+4096/len(base)) * len(base))
 		},
+
+		MaxCountScale: 1000,
 	}); err != nil {
 		t.Error(err)
 	}
