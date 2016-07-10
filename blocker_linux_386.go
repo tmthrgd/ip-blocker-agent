@@ -49,6 +49,8 @@ func (h *shmHeader) setBlocks(ip4, ip4len, ip6, ip6len, ip6r, ip6rlen int) {
 const (
 	headerSize = 0x58
 
+	ip4ListSize = (1 << 32) / 8
+
 	rwLockMaxReaders = 0x40000000
 
 	version = uint32((^uint(0)>>32)&0x80000000) | 0x00000001

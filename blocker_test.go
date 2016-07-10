@@ -1411,7 +1411,35 @@ func TestClientRemapLockFailure(t *testing.T) {
 	}
 }
 
-func TestInsertRangeMassive(t *testing.T) {
+func TestInsertRangeIP4Massive(t *testing.T) {
+	server, _, err := setup(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer server.Unlink()
+	defer server.Close()
+
+	ip, ipnet, err := net.ParseCIDR("0.0.0.0/0")
+	if err != nil {
+		panic(err)
+	}
+
+	if err = server.InsertRange(ip, ipnet); err != nil {
+		t.Error(err)
+	}
+
+	ip4, ip6, ip6r, err := server.Count()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if uint(ip4)-1 != 1<<32-1 || ip6 != 0 || ip6r != 0 {
+		t.Errorf("InsertRange(0.0.0.0/0) failed, invalid count, expected (4294967296, 0, 0), got (%d, %d, %d)", ip4, ip6, ip6r)
+	}
+}
+
+func TestInsertRangeIP6Massive(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -1421,26 +1449,10 @@ func TestInsertRangeMassive(t *testing.T) {
 
 	switch os.Getenv("INSERTMASSIVERANGETEST") {
 	case "1":
-		mask = "/2"
-		expect = 1073741824
-	case "2":
-		mask = "/1"
-		expect = 2147483648
-
-		if ^uint(0) == uint(^uint32(0)) {
-			t.Skip("INSERTMASSIVERANGETEST=2 cannot be run on 32-bit systems")
-		}
-	case "3":
-		mask = "/0"
-
-		expect = 4294967296 - 1
-		expect++
-
-		if ^uint(0) == uint(^uint32(0)) {
-			t.Skip("INSERTMASSIVERANGETEST=3 cannot be run on 32-bit systems")
-		}
+		mask = "/102"
+		expect = 67108864
 	default:
-		t.Skip("INSERTMASSIVERANGETEST is not set to 1, 2 or 3")
+		t.Skip("INSERTMASSIVERANGETEST is not set to 1")
 	}
 
 	server, _, err := setup(false)
@@ -1455,7 +1467,7 @@ func TestInsertRangeMassive(t *testing.T) {
 		t.Error(err)
 	}
 
-	ip, ipnet, err := net.ParseCIDR("192.0.2.0" + mask)
+	ip, ipnet, err := net.ParseCIDR("2001:db8::" + mask)
 	if err != nil {
 		panic(err)
 	}
@@ -1464,8 +1476,8 @@ func TestInsertRangeMassive(t *testing.T) {
 		t.Error(err)
 	}
 
-	if c := len(server.ip4s.Data) / net.IPv4len; c != expect {
-		t.Errorf("InsertRange(192.0.2.0%s) failed, expected count of %d ip4 address, got %d", mask, expect, c)
+	if c := len(server.ip6s.Data) / net.IPv6len; c != expect {
+		t.Errorf("InsertRange(2001:db8::%s) failed, expected count of %d ip6 address, got %d", mask, expect, c)
 	}
 }
 
@@ -1525,7 +1537,7 @@ func TestLoadSave(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(server1.ip4s.Data, server2.ip4s.Data) {
+	if !bytes.Equal(server1.ip4, server2.ip4) {
 		t.Errorf("ip4 data differs after Load, Save")
 	}
 
@@ -1810,7 +1822,7 @@ func BenchmarkContainsIP6(b *testing.B) {
 	benchmarkContains(b, "2001:db8::", 100000)
 }
 
-func benchmarkCommit(b *testing.B, extra int) {
+func benchmarkCommit(b *testing.B, extra int, resetIP4MaxMin bool) {
 	server, _, err := setup(false)
 	if err != nil {
 		b.Fatal(err)
@@ -1818,6 +1830,8 @@ func benchmarkCommit(b *testing.B, extra int) {
 
 	defer server.Unlink()
 	defer server.Close()
+
+	server.doNotResetIP4MaxMin = !resetIP4MaxMin
 
 	extraIP := make(net.IP, net.IPv6len)
 
@@ -1844,6 +1858,16 @@ func benchmarkCommit(b *testing.B, extra int) {
 		}
 	}
 
+	if resetIP4MaxMin {
+		if err = server.Commit(); err != nil {
+			b.Fatal(err)
+		}
+
+		if err = server.Batch(); err != nil {
+			b.Fatal(err)
+		}
+	}
+
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -1862,11 +1886,15 @@ func benchmarkCommit(b *testing.B, extra int) {
 }
 
 func BenchmarkCommitEmpty(b *testing.B) {
-	benchmarkCommit(b, 0)
+	benchmarkCommit(b, 0, false)
 }
 
 func BenchmarkCommit(b *testing.B) {
-	benchmarkCommit(b, 100000/3)
+	benchmarkCommit(b, 100000/3, false)
+}
+
+func BenchmarkCommitNoneChanged(b *testing.B) {
+	benchmarkCommit(b, 100000/3, true)
 }
 
 func BenchmarkClientRemap(b *testing.B) {

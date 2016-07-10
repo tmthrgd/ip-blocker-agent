@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tmthrgd/go-memset"
+	"github.com/tmthrgd/go-popcount"
 	"golang.org/x/sys/unix"
 )
 
@@ -25,9 +27,10 @@ func align(d, a int) int {
 	return (d + (a - 1)) &^ (a - 1)
 }
 
-func calculateOffsets(base, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size int) {
+func calculateOffsets(base, ip4Len, ip4Len2, ip6Len, ip6rLen int) (ip4BasePos, ip4BasePos2, ip6BasePos, ip6rBasePos, end, size int) {
 	ip4BasePos = align(base, cachelineSize)
-	ip6BasePos = align(ip4BasePos+ip4Len, cachelineSize)
+	ip4BasePos2 = align(ip4BasePos+ip4Len, cachelineSize)
+	ip6BasePos = align(ip4BasePos2+ip4Len2, cachelineSize)
 	ip6rBasePos = align(ip6BasePos+ip6Len, cachelineSize)
 	end = align(ip6rBasePos+ip6rLen, cachelineSize)
 	size = align(end, pageSize)
@@ -55,7 +58,10 @@ func Unlink(name string) error {
 type Server struct {
 	file *os.File
 
-	ip4s  binarySearcher
+	ip4    []byte
+	minIP4 int
+	maxIP4 int
+
 	ip6s  binarySearcher
 	ip6rs binarySearcher
 
@@ -66,6 +72,8 @@ type Server struct {
 
 	closed   bool
 	batching bool
+
+	doNotResetIP4MaxMin bool // for benchmarking
 }
 
 // New creates a new IP blocker shared memory server
@@ -79,7 +87,7 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(int(headerSize), 0, 0, 0)
+	ip4ScratchPos, ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(int(headerSize), ip4ListSize, 0, 0, 0)
 
 	if err = file.Truncate(int64(size)); err != nil {
 		return nil, err
@@ -104,7 +112,10 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	return &Server{
 		file: file,
 
-		ip4s:  binarySearcher{Size: net.IPv4len},
+		ip4:    data[ip4ScratchPos : ip4ScratchPos+ip4ListSize : ip4ScratchPos+ip4ListSize],
+		minIP4: -1,
+		maxIP4: -1,
+
 		ip6s:  binarySearcher{Size: net.IPv6len},
 		ip6rs: binarySearcher{Size: net.IPv6len / 2},
 
@@ -120,14 +131,14 @@ func (s *Server) commit() error {
 		return err
 	}
 
-	ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(int(headerSize), len(s.ip4s.Data), len(s.ip6s.Data), len(s.ip6rs.Data))
+	ip4ScratchPos, ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(int(headerSize), ip4ListSize, ip4ListSize, len(s.ip6s.Data), len(s.ip6rs.Data))
 
 	end := s.end
 	if end2 > end {
 		end = end2
 	}
 
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(end, len(s.ip4s.Data), len(s.ip6s.Data), len(s.ip6rs.Data))
+	_, _, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(end, 0, 0, len(s.ip6s.Data), len(s.ip6rs.Data))
 
 	if err := s.file.Truncate(int64(size)); err != nil {
 		return err
@@ -141,25 +152,27 @@ func (s *Server) commit() error {
 	header := castToHeader(&data[0])
 	lock := (*rwLock)(&header.Lock)
 
-	copy(data[ip4BasePos:ip4BasePos+len(s.ip4s.Data):ip6BasePos], s.ip4s.Data)
 	copy(data[ip6BasePos:ip6BasePos+len(s.ip6s.Data):ip6rBasePos], s.ip6s.Data)
 	copy(data[ip6rBasePos:ip6rBasePos+len(s.ip6rs.Data):size], s.ip6rs.Data)
 
 	lock.Lock()
 
-	header.setBlocks(ip4BasePos, len(s.ip4s.Data), ip6BasePos, len(s.ip6s.Data), ip6rBasePos, len(s.ip6rs.Data))
+	header.setBlocks(ip4ScratchPos, ip4ListSize, ip6BasePos, len(s.ip6s.Data), ip6rBasePos, len(s.ip6rs.Data))
 
 	header.Revision++
 
 	lock.Unlock()
 
-	copy(data[ip4BasePos2:ip4BasePos2+len(s.ip4s.Data):ip6BasePos2], s.ip4s.Data)
+	if s.minIP4 != -1 && s.maxIP4 != -1 {
+		copy(data[ip4BasePos2+s.minIP4:ip4BasePos2+s.maxIP4:ip6BasePos2], data[ip4ScratchPos+s.minIP4:ip4ScratchPos+s.maxIP4:ip4ScratchPos+ip4ListSize])
+	}
+
 	copy(data[ip6BasePos2:ip6BasePos2+len(s.ip6s.Data):ip6rBasePos2], s.ip6s.Data)
 	copy(data[ip6rBasePos2:ip6rBasePos2+len(s.ip6rs.Data):size2], s.ip6rs.Data)
 
 	lock.Lock()
 
-	header.setBlocks(ip4BasePos2, len(s.ip4s.Data), ip6BasePos2, len(s.ip6s.Data), ip6rBasePos2, len(s.ip6rs.Data))
+	header.setBlocks(ip4BasePos2, ip4ListSize, ip6BasePos2, len(s.ip6s.Data), ip6rBasePos2, len(s.ip6rs.Data))
 
 	header.Revision++
 
@@ -177,6 +190,12 @@ func (s *Server) commit() error {
 	data, err = unix.Mmap(int(s.file.Fd()), 0, size2, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return err
+	}
+
+	s.ip4 = data[ip4ScratchPos : ip4ScratchPos+ip4ListSize : ip4ScratchPos+ip4ListSize]
+
+	if !s.doNotResetIP4MaxMin {
+		s.minIP4, s.maxIP4 = -1, -1
 	}
 
 	s.data = data
@@ -213,10 +232,20 @@ func (s *Server) doInsertRemove(ip net.IP, insert bool) error {
 	}
 
 	if ip4 := ip.To4(); ip4 != nil {
+		b := binary.BigEndian.Uint32(ip4)
+
+		if s.minIP4 == -1 || int(b>>3) < s.minIP4 {
+			s.minIP4 = int(b >> 3)
+		}
+
+		if s.maxIP4 == -1 || int(b>>3) >= s.maxIP4 {
+			s.maxIP4 = int(b>>3) + 1
+		}
+
 		if insert {
-			s.ip4s.Insert(ip4)
+			s.ip4[b>>3] |= 1 << (b & 7)
 		} else {
-			s.ip4s.Remove(ip4)
+			s.ip4[b>>3] &^= 1 << (b & 7)
 		}
 	} else if ip6 := ip.To16(); ip6 != nil {
 		if insert {
@@ -276,35 +305,65 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
-	var ips *binarySearcher
+	ones, _ := ipnet.Mask.Size()
 
 	if ip4 := masked.To4(); ip4 != nil {
-		ip = ip4
-		ips = &s.ip4s
-	} else if ip6 := masked.To16(); ip6 != nil {
-		ip = ip6
+		base := uint64(binary.BigEndian.Uint32(ip4))
 
-		if ones, _ := ipnet.Mask.Size(); ones <= s.ip6rs.Size*8 {
-			ips = &s.ip6rs
+		end := base + uint64(1)<<uint(32-ones)
+		if end > 1<<32 {
+			end = 1 << 32
+		}
+
+		if s.minIP4 == -1 || int(base>>3) < s.minIP4 {
+			s.minIP4 = int(base >> 3)
+		}
+
+		if s.maxIP4 == -1 || int(end>>3) > s.maxIP4 {
+			s.maxIP4 = int(end >> 3)
+		}
+
+		if insert {
+			for ; base&7 != 0 && base < end; base++ {
+				s.ip4[base>>3] |= 1 << (base & 7)
+			}
+
+			memset.Memset(s.ip4[base>>3:end>>3], 0xff)
+
+			for base = end &^ 7; base < end; base++ {
+				s.ip4[base>>3] |= 1 << (base & 7)
+			}
 		} else {
-			ips = &s.ip6s
+			for ; base&7 != 0 && base < end; base++ {
+				s.ip4[base>>3] &^= 1 << (base & 7)
+			}
+
+			memset.Memset(s.ip4[base>>3:end>>3], 0)
+
+			for base = end &^ 7; base < end; base++ {
+				s.ip4[base>>3] &^= 1 << (base & 7)
+			}
+		}
+	} else if ip6 := masked.To16(); ip6 != nil {
+		ips := &s.ip6s
+
+		if ones <= s.ip6rs.Size*8 {
+			ips = &s.ip6rs
+		}
+
+		ones = ips.Size*8 - ones
+
+		if (^uint(0) == uint(^uint32(0)) && ones > 30) || (^uint(0) != uint(^uint32(0)) && ones > 62) {
+			return errRangeTooLarge
+		}
+
+		if insert {
+			ips.InsertRange(ip6[:ips.Size], 1<<uint(ones))
+		} else {
+			ips.RemoveRange(ip6[:ips.Size], 1<<uint(ones))
 		}
 	} else {
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
-	}
-
-	base := ip[:ips.Size]
-	ones, _ := ipnet.Mask.Size()
-	ones = len(base)*8 - ones
-
-	if (^uint(0) == uint(^uint32(0)) && ones > 30) || (^uint(0) != uint(^uint32(0)) && ones > 62) {
-		return errRangeTooLarge
-	}
-
-	if insert {
-		ips.InsertRange(base, 1<<uint(ones))
-	} else {
-		ips.RemoveRange(base, 1<<uint(ones))
 	}
 
 	if s.batching {
@@ -365,7 +424,7 @@ func (s *Server) Save(w io.Writer) error {
 		return err
 	}
 
-	if err := binary.Write(w, binary.BigEndian, uint64(len(s.ip4s.Data))); err != nil {
+	if err := binary.Write(w, binary.BigEndian, uint64(len(s.ip4))); err != nil {
 		return err
 	}
 
@@ -377,7 +436,7 @@ func (s *Server) Save(w io.Writer) error {
 		return err
 	}
 
-	if _, err := w.Write(s.ip4s.Data); err != nil {
+	if _, err := w.Write(s.ip4); err != nil {
 		return err
 	}
 
@@ -431,16 +490,19 @@ func (s *Server) Load(r io.Reader) error {
 		return err
 	}
 
-	if l4%4 != 0 || l6%16 != 0 || l6r%8 != 0 {
+	if (l4 != 0 && l4 != ip4ListSize) || l6%16 != 0 || l6r%8 != 0 {
 		return InvalidDataError{errInvalidHeader}
 	}
 
-	s.ip4s.Data = make([]byte, l4)
 	s.ip6s.Data = make([]byte, l6)
 	s.ip6rs.Data = make([]byte, l6r)
 
-	if _, err := io.ReadFull(r, s.ip4s.Data); err != nil {
-		return err
+	if l4 != 0 {
+		if _, err := io.ReadFull(r, s.ip4); err != nil {
+			return err
+		}
+
+		s.minIP4, s.maxIP4 = 0, ip4ListSize
 	}
 
 	if _, err := io.ReadFull(r, s.ip6s.Data); err != nil {
@@ -473,7 +535,9 @@ func (s *Server) Clear() error {
 		return ErrClosed
 	}
 
-	s.ip4s.Clear()
+	memset.Memset(s.ip4, 0)
+	s.minIP4, s.maxIP4 = 0, ip4ListSize
+
 	s.ip6s.Clear()
 	s.ip6rs.Clear()
 
@@ -509,7 +573,6 @@ func (s *Server) Batch() error {
 func (s *Server) close() error {
 	s.closed = true
 
-	s.ip4s.Clear()
 	s.ip6s.Clear()
 	s.ip6rs.Clear()
 
@@ -593,7 +656,10 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 
 	header := castToHeader(&s.data[0])
 
-	ip4 = int(header.IP4.Len / net.IPv4len)
+	if header.IP4.Len == ip4ListSize {
+		ip4 = int(popcount.CountBytes(s.data[header.IP4.Base : header.IP4.Base+header.IP4.Len]))
+	}
+
 	ip6 = int(header.IP6.Len / net.IPv6len)
 	ip6routes = int(header.IP6Route.Len / (net.IPv6len / 2))
 	return

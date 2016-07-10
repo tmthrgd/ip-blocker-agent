@@ -6,11 +6,13 @@
 package blocker
 
 import (
+	"encoding/binary"
 	"net"
 	"os"
 	"sync"
 	"sync/atomic"
 
+	"github.com/tmthrgd/go-popcount"
 	"golang.org/x/sys/unix"
 )
 
@@ -192,7 +194,7 @@ func (c *Client) checkSharedMemory() bool {
 		int(uintptr(header.IP4.Base)+uintptr(header.IP4.Len)) <= len(c.data) &&
 		int(uintptr(header.IP6.Base)+uintptr(header.IP6.Len)) <= len(c.data) &&
 		int(uintptr(header.IP6Route.Base)+uintptr(header.IP6Route.Len)) <= len(c.data) &&
-		header.IP4.Len%4 == 0 &&
+		(header.IP4.Len == 0 || header.IP4.Len == ip4ListSize) &&
 		header.IP6.Len%16 == 0 &&
 		header.IP6Route.Len%8 == 0
 }
@@ -229,22 +231,13 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 	defer lock.RUnlock()
 
 	if ip4 := ip.To4(); ip4 != nil {
-		ip = ip4
-
 		if header.IP4.Len == 0 {
 			return false, nil
 		}
 
-		end := int(header.IP4.Base) + int(header.IP4.Len)
-		searcher := binarySearcher{
-			Data: c.data[header.IP4.Base:end:end],
-			Size: net.IPv4len,
-		}
-
-		return searcher.Contains(ip), nil
+		u32 := binary.BigEndian.Uint32(ip4)
+		return c.data[uintptr(header.IP4.Base)+uintptr(u32>>3)]&(1<<(u32&7)) != 0, nil
 	} else if ip6 := ip.To16(); ip6 != nil {
-		ip = ip6
-
 		if header.IP6Route.Len != 0 {
 			end := int(header.IP6Route.Base) + int(header.IP6Route.Len)
 			searcher := binarySearcher{
@@ -252,7 +245,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 				Size: net.IPv6len / 2,
 			}
 
-			if searcher.Contains(ip[:net.IPv6len/2]) {
+			if searcher.Contains(ip6[:net.IPv6len/2]) {
 				return true, nil
 			}
 		}
@@ -267,7 +260,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 			Size: net.IPv6len,
 		}
 
-		return searcher.Contains(ip), nil
+		return searcher.Contains(ip6), nil
 	} else {
 		return false, &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
@@ -324,7 +317,20 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 	lock := (*rwLock)(&header.Lock)
 	lock.RLock()
 
-	ip4 = int(header.IP4.Len / net.IPv4len)
+	if c.revision != uint32(header.Revision) {
+		/* RUnlock is called inside of remap iff an error is returned */
+		if err = c.remap(false); err != nil {
+			return
+		}
+
+		header = castToHeader(&c.data[0])
+		lock = (*rwLock)(&header.Lock)
+	}
+
+	if header.IP4.Len == ip4ListSize {
+		ip4 = int(popcount.CountBytes(c.data[header.IP4.Base : header.IP4.Base+header.IP4.Len]))
+	}
+
 	ip6 = int(header.IP6.Len / net.IPv6len)
 	ip6routes = int(header.IP6Route.Len / (net.IPv6len / 2))
 
