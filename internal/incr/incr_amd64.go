@@ -7,15 +7,6 @@
 
 package incr
 
-//go:noescape
-func incrementBytes4Asm(*byte, *byte, uint64)
-
-//go:noescape
-func incrementBytes8Asm(*byte, *byte, uint64)
-
-//go:noescape
-func incrementBytes16Asm(*byte, *byte, uint64)
-
 func IncrementBytes(base, data []byte) {
 	if len(data) == 0 {
 		return
@@ -44,3 +35,15 @@ func IncrementBytes(base, data []byte) {
 		incrementBytesFallback(base, data)
 	}
 }
+
+// This function is implemented in incr4_amd64.s
+//go:noescape
+func incrementBytes4Asm(*byte, *byte, uint64)
+
+// This function is implemented in incr8_amd64.s
+//go:noescape
+func incrementBytes8Asm(*byte, *byte, uint64)
+
+// This function is implemented in incr16_amd64.s
+//go:noescape
+func incrementBytes16Asm(*byte, *byte, uint64)
