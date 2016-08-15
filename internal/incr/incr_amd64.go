@@ -36,14 +36,16 @@ func IncrementBytes(base, data []byte) {
 	}
 }
 
+//go:generate go run asm_gen.go
+
 // This function is implemented in incr4_amd64.s
 //go:noescape
-func incrementBytes4Asm(*byte, *byte, uint64)
+func incrementBytes4Asm(base *byte, data *byte, len uint64)
 
 // This function is implemented in incr8_amd64.s
 //go:noescape
-func incrementBytes8Asm(*byte, *byte, uint64)
+func incrementBytes8Asm(base *byte, data *byte, len uint64)
 
 // This function is implemented in incr16_amd64.s
 //go:noescape
-func incrementBytes16Asm(*byte, *byte, uint64)
+func incrementBytes16Asm(base *byte, data *byte, len uint64)
