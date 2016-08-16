@@ -19,7 +19,7 @@ const header = `// Copyright 2016 Tom Thorogood. All rights reserved.
 // +build amd64,!gccgo,!appengine
 `
 
-func incrementBytes48(a *asm.Asm, incrBy, beShuf asm.Data, movIntoX0, movSi, padd, inc, bswap, pextr func(...asm.Operand), extrInt, size int) {
+func incrementBytes48(a *asm.Asm, incrBy, beShuf asm.Data, movIntoX0, movSi, padd, inc, bswap, pextr func(...asm.Operand), size int) {
 	base := a.Argument("base", 8)
 	data := a.Argument("data", 8)
 	length := a.Argument("len", 8)
@@ -101,7 +101,7 @@ func incrementBytes48(a *asm.Asm, incrBy, beShuf asm.Data, movIntoX0, movSi, pad
 
 	a.Label(loopFromX0)
 
-	pextr(si, asm.X0, asm.Constant(extrInt))
+	pextr(si, asm.X0, asm.Constant((16/size)-1))
 
 	inc(si)
 	bswap(si)
@@ -143,7 +143,7 @@ func incrementBytes4Asm(a *asm.Asm) {
 	a.NewFunction("incrementBytes4Asm")
 	a.NoSplit()
 
-	incrementBytes48(a, incrBy, beShuf, a.Vbroadcastss, a.Movl, a.Paddl, a.Incl, a.Bswapl, a.Pextrd, 3, 4)
+	incrementBytes48(a, incrBy, beShuf, a.Vbroadcastss, a.Movl, a.Paddl, a.Incl, a.Bswapl, a.Pextrd, 4)
 }
 
 func incrementBytes8Asm(a *asm.Asm) {
@@ -166,7 +166,7 @@ func incrementBytes8Asm(a *asm.Asm) {
 
 		a.Movq(ops[0], ops[1])
 		a.Movlhps(ops[0], ops[0])
-	}, a.Movq, a.Paddq, a.Incq, a.Bswapq, a.Pextrq, 1, 8)
+	}, a.Movq, a.Paddq, a.Incq, a.Bswapq, a.Pextrq, 8)
 }
 
 func incrementBytes16Asm(a *asm.Asm) {
