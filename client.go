@@ -12,7 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tmthrgd/go-popcount"
+	"github.com/tmthrgd/go-bitset"
 	"golang.org/x/sys/unix"
 )
 
@@ -235,8 +235,11 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 			return false, nil
 		}
 
-		u32 := binary.BigEndian.Uint32(ip4)
-		return c.data[uintptr(header.IP4.Base)+uintptr(u32>>3)]&(1<<(u32&7)) != 0, nil
+		end := int(header.IP4.Base) + int(header.IP4.Len)
+		bs := bitset.Bitset(c.data[header.IP4.Base:end:end])
+
+		ip := uint(binary.BigEndian.Uint32(ip4))
+		return bs.IsSet(ip), nil
 	} else if ip6 := ip.To16(); ip6 != nil {
 		if header.IP6Route.Len != 0 {
 			end := int(header.IP6Route.Base) + int(header.IP6Route.Len)
@@ -328,7 +331,9 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 	}
 
 	if header.IP4.Len == ip4ListSize {
-		ip4 = int(popcount.CountBytes(c.data[header.IP4.Base : header.IP4.Base+header.IP4.Len]))
+		end := int(header.IP4.Base) + int(header.IP4.Len)
+		bs := bitset.Bitset(c.data[header.IP4.Base:end:end])
+		ip4 = bs.Count()
 	}
 
 	ip6 = int(header.IP6.Len / net.IPv6len)

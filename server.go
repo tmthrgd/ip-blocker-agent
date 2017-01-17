@@ -13,8 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/tmthrgd/go-memset"
-	"github.com/tmthrgd/go-popcount"
+	"github.com/tmthrgd/go-bitset"
 	"golang.org/x/sys/unix"
 )
 
@@ -58,7 +57,7 @@ func Unlink(name string) error {
 type Server struct {
 	file *os.File
 
-	ip4    []byte
+	ip4    bitset.Bitset
 	minIP4 int
 	maxIP4 int
 
@@ -243,9 +242,9 @@ func (s *Server) doInsertRemove(ip net.IP, insert bool) error {
 		}
 
 		if insert {
-			s.ip4[b>>3] |= 1 << (b & 7)
+			s.ip4.Set(uint(b))
 		} else {
-			s.ip4[b>>3] &^= 1 << (b & 7)
+			s.ip4.Clear(uint(b))
 		}
 	} else if ip6 := ip.To16(); ip6 != nil {
 		if insert {
@@ -324,25 +323,9 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		}
 
 		if insert {
-			for ; base&7 != 0 && base < end; base++ {
-				s.ip4[base>>3] |= 1 << (base & 7)
-			}
-
-			memset.Memset(s.ip4[base>>3:end>>3], 0xff)
-
-			for base = end &^ 7; base < end; base++ {
-				s.ip4[base>>3] |= 1 << (base & 7)
-			}
+			s.ip4.SetRange(uint(base), uint(end))
 		} else {
-			for ; base&7 != 0 && base < end; base++ {
-				s.ip4[base>>3] &^= 1 << (base & 7)
-			}
-
-			memset.Memset(s.ip4[base>>3:end>>3], 0)
-
-			for base = end &^ 7; base < end; base++ {
-				s.ip4[base>>3] &^= 1 << (base & 7)
-			}
+			s.ip4.ClearRange(uint(base), uint(end))
 		}
 	} else if ip6 := masked.To16(); ip6 != nil {
 		ips := &s.ip6s
@@ -535,11 +518,11 @@ func (s *Server) Clear() error {
 		return ErrClosed
 	}
 
-	memset.Memset(s.ip4, 0)
-	s.minIP4, s.maxIP4 = 0, ip4ListSize
-
+	s.ip4.Reset()
 	s.ip6s.Clear()
 	s.ip6rs.Clear()
+
+	s.minIP4, s.maxIP4 = 0, ip4ListSize
 
 	if s.batching {
 		return nil
@@ -657,7 +640,8 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 	header := castToHeader(&s.data[0])
 
 	if header.IP4.Len == ip4ListSize {
-		ip4 = int(popcount.CountBytes(s.data[header.IP4.Base : header.IP4.Base+header.IP4.Len]))
+		bs := bitset.Bitset(s.data[header.IP4.Base : header.IP4.Base+header.IP4.Len])
+		ip4 = bs.Count()
 	}
 
 	ip6 = int(header.IP6.Len / net.IPv6len)
