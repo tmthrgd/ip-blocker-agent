@@ -34,7 +34,7 @@ type Client struct {
 func Open(name string) (*Client, error) {
 	file, err := shm.Open(name, os.O_RDWR, 0)
 	if err != nil {
-		return nil, &os.PathError{Op: "open", Path: name, Err: err}
+		return nil, err
 	}
 
 	stat, err := file.Stat()
