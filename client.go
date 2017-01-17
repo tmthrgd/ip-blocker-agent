@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tmthrgd/binary-searcher"
+	"github.com/tmthrgd/go-shm"
 	"golang.org/x/sys/unix"
 )
 
@@ -31,7 +32,7 @@ type Client struct {
 // Open returns a new IP blocker shared memory client
 // specified by name.
 func Open(name string) (*Client, error) {
-	file, err := shmOpen(name, os.O_RDWR, 0)
+	file, err := shm.Open(name, os.O_RDWR, 0)
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}

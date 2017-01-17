@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tmthrgd/binary-searcher"
+	"github.com/tmthrgd/go-shm"
 	"github.com/tmthrgd/ip-blocker-agent/internal/incr"
 	"golang.org/x/sys/unix"
 )
@@ -46,7 +47,7 @@ func calculateOffsets(base, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos
 // 	object  with  the same name will fail (unless O_CREAT was specified, in
 // 	which case a new, distinct object is created).
 func Unlink(name string) error {
-	if err := shmUnlink(name); err != nil {
+	if err := shm.Unlink(name); err != nil {
 		return &os.PathError{Op: "unlink", Path: name, Err: err}
 	}
 
@@ -76,7 +77,7 @@ type Server struct {
 // This will fail if a shared memory region has already
 // been created with the same name and not unlinked.
 func New(name string, perm os.FileMode) (*Server, error) {
-	file, err := shmOpen(name, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, perm)
+	file, err := shm.Open(name, os.O_CREATE|os.O_EXCL|os.O_TRUNC|os.O_RDWR, perm)
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
