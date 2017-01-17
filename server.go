@@ -641,7 +641,7 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 
 	if header.IP4.Len == ip4ListSize {
 		bs := bitset.Bitset(s.data[header.IP4.Base : header.IP4.Base+header.IP4.Len])
-		ip4 = bs.Count()
+		ip4 = int(bs.Count())
 	}
 
 	ip6 = int(header.IP6.Len / net.IPv6len)

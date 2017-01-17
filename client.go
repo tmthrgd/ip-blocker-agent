@@ -333,7 +333,7 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 	if header.IP4.Len == ip4ListSize {
 		end := int(header.IP4.Base) + int(header.IP4.Len)
 		bs := bitset.Bitset(c.data[header.IP4.Base:end:end])
-		ip4 = bs.Count()
+		ip4 = int(bs.Count())
 	}
 
 	ip6 = int(header.IP6.Len / net.IPv6len)
