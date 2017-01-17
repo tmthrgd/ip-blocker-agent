@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tmthrgd/binary-searcher"
+	"github.com/tmthrgd/ip-blocker-agent/internal/incr"
 	"golang.org/x/sys/unix"
 )
 
@@ -55,9 +57,9 @@ func Unlink(name string) error {
 type Server struct {
 	file *os.File
 
-	ip4s  binarySearcher
-	ip6s  binarySearcher
-	ip6rs binarySearcher
+	ip4s  searcher.BinarySearcher
+	ip6s  searcher.BinarySearcher
+	ip6rs searcher.BinarySearcher
 
 	data []byte
 	end  int
@@ -104,9 +106,9 @@ func New(name string, perm os.FileMode) (*Server, error) {
 	return &Server{
 		file: file,
 
-		ip4s:  binarySearcher{Size: net.IPv4len},
-		ip6s:  binarySearcher{Size: net.IPv6len},
-		ip6rs: binarySearcher{Size: net.IPv6len / 2},
+		ip4s:  searcher.BinarySearcher{Size: net.IPv4len, IncrementBytes: incr.IncrementBytes},
+		ip6s:  searcher.BinarySearcher{Size: net.IPv6len, IncrementBytes: incr.IncrementBytes},
+		ip6rs: searcher.BinarySearcher{Size: net.IPv6len / 2, IncrementBytes: incr.IncrementBytes},
 
 		data: data,
 		end:  end,
@@ -276,7 +278,7 @@ func (s *Server) doInsertRemoveRange(ip net.IP, ipnet *net.IPNet, insert bool) e
 		return &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
 	}
 
-	var ips *binarySearcher
+	var ips *searcher.BinarySearcher
 
 	if ip4 := masked.To4(); ip4 != nil {
 		ip = ip4

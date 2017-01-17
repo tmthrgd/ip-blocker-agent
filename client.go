@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tmthrgd/binary-searcher"
 	"golang.org/x/sys/unix"
 )
 
@@ -236,21 +237,14 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		end := int(header.IP4.Base) + int(header.IP4.Len)
-		searcher := binarySearcher{
-			Data: c.data[header.IP4.Base:end:end],
-			Size: net.IPv4len,
-		}
-
+		searcher := searcher.New(c.data[header.IP4.Base:end:end], net.IPv4len)
 		return searcher.Contains(ip), nil
 	} else if ip6 := ip.To16(); ip6 != nil {
 		ip = ip6
 
 		if header.IP6Route.Len != 0 {
 			end := int(header.IP6Route.Base) + int(header.IP6Route.Len)
-			searcher := binarySearcher{
-				Data: c.data[header.IP6Route.Base:end:end],
-				Size: net.IPv6len / 2,
-			}
+			searcher := searcher.New(c.data[header.IP6Route.Base:end:end], net.IPv6len/2)
 
 			if searcher.Contains(ip[:net.IPv6len/2]) {
 				return true, nil
@@ -262,11 +256,7 @@ func (c *Client) Contains(ip net.IP) (bool, error) {
 		}
 
 		end := int(header.IP6.Base) + int(header.IP6.Len)
-		searcher := binarySearcher{
-			Data: c.data[header.IP6.Base:end:end],
-			Size: net.IPv6len,
-		}
-
+		searcher := searcher.New(c.data[header.IP6.Base:end:end], net.IPv6len)
 		return searcher.Contains(ip), nil
 	} else {
 		return false, &net.AddrError{Err: "invalid IP address", Addr: ip.String()}
