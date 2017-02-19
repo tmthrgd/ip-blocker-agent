@@ -26,13 +26,11 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	JB loop_from_si
 	CMPB runtime·support_avx(SB), $1
 	JNE loop_from_si
-	MOVOU avx8BEShuf<>(SB), X15
 	MOVQ (SI), X0
 	MOVLHPS X0, X0
 	PSHUFB avx8BEShuf<>(SB), X0
 	PADDQ avx8IncBy<>(SB), X0
-	// VPSHUFB X15, X0, X1
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xcf
+	VPSHUFB avx8BEShuf<>(SB), X0, X1
 	MOVUPS X1, (DI)
 	ADDQ $16, DI
 	SUBQ $16, BX
@@ -43,20 +41,16 @@ TEXT ·incrementBytes8Asm(SB),NOSPLIT,$0
 	JB bigloop
 hugeloop:
 	PADDQ avx8IncBy<>+0x10(SB), X0
-	// VPSHUFB X15, X0, X1
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xcf
+	VPSHUFB avx8BEShuf<>(SB), X0, X1
 	MOVUPS X1, (DI)
 	PADDQ avx8IncBy<>+0x10(SB), X0
-	// VPSHUFB X15, X0, X1
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xcf
+	VPSHUFB avx8BEShuf<>(SB), X0, X1
 	MOVUPS X1, 16(DI)
 	PADDQ avx8IncBy<>+0x10(SB), X0
-	// VPSHUFB X15, X0, X1
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xcf
+	VPSHUFB avx8BEShuf<>(SB), X0, X1
 	MOVUPS X1, 32(DI)
 	PADDQ avx8IncBy<>+0x10(SB), X0
-	// VPSHUFB X15, X0, X1
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xcf
+	VPSHUFB avx8BEShuf<>(SB), X0, X1
 	MOVUPS X1, 48(DI)
 	ADDQ $64, DI
 	SUBQ $64, BX
@@ -67,8 +61,7 @@ hugeloop:
 	JB loop_from_x0
 bigloop:
 	PADDQ avx8IncBy<>+0x10(SB), X0
-	// VPSHUFB X15, X0, X1
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xcf
+	VPSHUFB avx8BEShuf<>(SB), X0, X1
 	MOVUPS X1, (DI)
 	ADDQ $16, DI
 	SUBQ $16, BX

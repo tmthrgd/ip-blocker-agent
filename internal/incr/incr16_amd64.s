@@ -36,24 +36,20 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	JB loop_from_si
 	CMPB runtime·support_avx(SB), $1
 	JNE loop_from_si
-	MOVQ $avx16Overflow<>(SB), R13
-	MOVQ $avx16QOne<>(SB), R14
-	MOVOU avx16BEShuf<>(SB), X15
+	MOVQ $avx16Overflow<>(SB), R15
 	MOVQ (SI), X1
 	MOVLHPS X1, X1
 	MOVQ 8(SI), X0
 	MOVLHPS X0, X0
 	PSHUFB avx16BEShuf<>(SB), X0
 	PSHUFB avx16BEShuf<>(SB), X1
-	// VPCMPEQQ (R13), X0, X2
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x29; BYTE $0x55; BYTE $0x00
+	// VPCMPEQQ (R15), X0, X2
+	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x29; BYTE $0x17
 	PAND avx16QOne<>(SB), X2
 	PADDQ X2, X1
 	PADDQ avx16IncBy<>(SB), X0
-	// VPSHUFB X15, X0, X3
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xdf
-	// VPSHUFB X15, X1, X4
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x71; BYTE $0x00; BYTE $0xe7
+	VPSHUFB avx16BEShuf<>(SB), X0, X3
+	VPSHUFB avx16BEShuf<>(SB), X1, X4
 	// VPUNPCKLQDQ X3, X4, X2
 	BYTE $0xc5; BYTE $0xd9; BYTE $0x6c; BYTE $0xd3
 	MOVUPS X2, (DI)
@@ -66,17 +62,14 @@ TEXT ·incrementBytes16Asm(SB),NOSPLIT,$0
 	CMPQ BX, $32
 	JB loop_from_x0x1
 bigloop:
-	// VPOR 16(R14), X0, X2
-	BYTE $0xc4; BYTE $0xc1; BYTE $0x79; BYTE $0xeb; BYTE $0x56; BYTE $0x10
-	// PCMPEQQ 16(R13), X2
-	BYTE $0x66; BYTE $0x41; BYTE $0x0f; BYTE $0x38; BYTE $0x29; BYTE $0x55; BYTE $0x10
+	VPOR avx16QOne<>+0x10(SB), X0, X2
+	// PCMPEQQ 16(R15), X2
+	BYTE $0x66; BYTE $0x41; BYTE $0x0f; BYTE $0x38; BYTE $0x29; BYTE $0x57; BYTE $0x10
 	PAND avx16QOne<>+0x10(SB), X2
 	PADDQ X2, X1
 	PADDQ avx16IncBy<>+0x10(SB), X0
-	// VPSHUFB X15, X0, X3
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x79; BYTE $0x00; BYTE $0xdf
-	// VPSHUFB X15, X1, X4
-	BYTE $0xc4; BYTE $0xc2; BYTE $0x71; BYTE $0x00; BYTE $0xe7
+	VPSHUFB avx16BEShuf<>(SB), X0, X3
+	VPSHUFB avx16BEShuf<>(SB), X1, X4
 	// VPUNPCKLQDQ X3, X4, X2
 	BYTE $0xc5; BYTE $0xd9; BYTE $0x6c; BYTE $0xd3
 	MOVUPS X2, (DI)

@@ -46,14 +46,12 @@ func incrementBytes48(a *asm.Asm, incrBy, beShuf asm.Data, movIntoX0, movSi, pad
 	a.Cmpb(asm.Constant(1), asm.Data("runtime·support_avx"))
 	a.Jne(loopFromSI)
 
-	a.Movou(asm.X15, beShuf)
-
 	movIntoX0(asm.X0, asm.Address(si))
 	a.Pshufb(asm.X0, beShuf)
 
 	padd(asm.X0, incrBy)
 
-	a.Vpshufb(asm.X1, asm.X0, asm.X15)
+	a.Vpshufb(asm.X1, asm.X0, beShuf)
 	a.Movups(asm.Address(di), asm.X1)
 
 	a.Addq(di, asm.Constant(16))
@@ -71,7 +69,7 @@ func incrementBytes48(a *asm.Asm, incrBy, beShuf asm.Data, movIntoX0, movSi, pad
 	for i := 0; i < 64; i += 16 {
 		padd(asm.X0, incrBy.Offset(16))
 
-		a.Vpshufb(asm.X1, asm.X0, asm.X15)
+		a.Vpshufb(asm.X1, asm.X0, beShuf)
 		a.Movups(asm.Address(di, i), asm.X1)
 	}
 
@@ -89,7 +87,7 @@ func incrementBytes48(a *asm.Asm, incrBy, beShuf asm.Data, movIntoX0, movSi, pad
 
 	padd(asm.X0, incrBy.Offset(16))
 
-	a.Vpshufb(asm.X1, asm.X0, asm.X15)
+	a.Vpshufb(asm.X1, asm.X0, beShuf)
 	a.Movups(asm.Address(di), asm.X1)
 
 	a.Addq(di, asm.Constant(16))
@@ -219,9 +217,7 @@ func incrementBytes16Asm(a *asm.Asm) {
 	a.Cmpb(asm.Constant(1), asm.Data("runtime·support_avx"))
 	a.Jne(loopFromSI)
 
-	a.Movq(asm.R13, overflow.Address())
-	a.Movq(asm.R14, qOne.Address())
-	a.Movou(asm.X15, beShuf)
+	a.Movq(asm.R15, overflow.Address())
 
 	a.Movq(asm.X1, asm.Address(si))
 	a.Movlhps(asm.X1, asm.X1)
@@ -232,14 +228,14 @@ func incrementBytes16Asm(a *asm.Asm) {
 	a.Pshufb(asm.X0, beShuf)
 	a.Pshufb(asm.X1, beShuf)
 
-	a.Vpcmpeqq(asm.X2, asm.X0, asm.Address(asm.R13))
+	a.Vpcmpeqq(asm.X2, asm.X0, asm.Address(asm.R15))
 	a.Pand(asm.X2, qOne)
 	a.Paddq(asm.X1, asm.X2)
 
 	a.Paddq(asm.X0, incrBy)
 
-	a.Vpshufb(asm.X3, asm.X0, asm.X15)
-	a.Vpshufb(asm.X4, asm.X1, asm.X15)
+	a.Vpshufb(asm.X3, asm.X0, beShuf)
+	a.Vpshufb(asm.X4, asm.X1, beShuf)
 
 	a.Vpunpcklqdq(asm.X2, asm.X4, asm.X3)
 	a.Movups(asm.Address(di), asm.X2)
@@ -256,15 +252,15 @@ func incrementBytes16Asm(a *asm.Asm) {
 
 	a.Label(bigloop)
 
-	a.Vpor(asm.X2, asm.X0, asm.Address(asm.R14, 16))
-	a.Pcmpeqq(asm.X2, asm.Address(asm.R13, 16))
+	a.Vpor(asm.X2, asm.X0, qOne.Offset(16))
+	a.Pcmpeqq(asm.X2, asm.Address(asm.R15, 16))
 	a.Pand(asm.X2, qOne.Offset(16))
 	a.Paddq(asm.X1, asm.X2)
 
 	a.Paddq(asm.X0, incrBy.Offset(16))
 
-	a.Vpshufb(asm.X3, asm.X0, asm.X15)
-	a.Vpshufb(asm.X4, asm.X1, asm.X15)
+	a.Vpshufb(asm.X3, asm.X0, beShuf)
+	a.Vpshufb(asm.X4, asm.X1, beShuf)
 
 	a.Vpunpcklqdq(asm.X2, asm.X4, asm.X3)
 	a.Movups(asm.Address(di), asm.X2)
