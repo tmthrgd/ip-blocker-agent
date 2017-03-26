@@ -14,13 +14,22 @@ import (
 	"github.com/tmthrgd/ip-blocker-agent"
 )
 
-type handler struct {
-	c *blocker.Client
+// Handler is a http.Handler that blocks clients
+// with IP addresses that are/are-not in the block
+// list.
+type Handler struct {
+	Client *blocker.Client
 
-	http.Handler
-	block http.Handler
+	// The http.Handler to invoke when the
+	// client is not blocked.
+	Handler http.Handler
+	// The http.Handler to invoke when the
+	// client is blocked.
+	Blocked http.Handler
 
-	whitelist bool
+	// If true, only clients in the block
+	// list are accepted.
+	Whitelist bool
 }
 
 // Block wraps a given http.Handler and blocks all
@@ -34,18 +43,11 @@ func Block(c *blocker.Client, h http.Handler) http.Handler {
 // all clients that are contained in the blocklist with
 // the given status code.
 func BlockWithCode(c *blocker.Client, h http.Handler, code int) http.Handler {
-	return BlockWithHandler(c, h, errorHandler(code))
-}
-
-// BlockWithHandler wraps a given http.Handler and routes
-// all clients that are contained in the blocklist to the
-// block http.Handler and the rest to the h http.Handler.
-func BlockWithHandler(c *blocker.Client, h http.Handler, block http.Handler) http.Handler {
-	return &handler{
-		c: c,
+	return &Handler{
+		Client: c,
 
 		Handler: h,
-		block:   block,
+		Blocked: errorHandler(code),
 	}
 }
 
@@ -60,26 +62,19 @@ func Whitelist(c *blocker.Client, h http.Handler) http.Handler {
 // blocks all clients that are not contained in the
 // list with the given status code.
 func WhitelistWithCode(c *blocker.Client, h http.Handler, code int) http.Handler {
-	return WhitelistWithHandler(c, h, errorHandler(code))
-}
-
-// WhitelistWithHandler wraps a given http.Handler and
-// routes all clients that are contained in the list to
-// the h http.Handler and the rest to the block
-// http.Handler.
-func WhitelistWithHandler(c *blocker.Client, h http.Handler, block http.Handler) http.Handler {
-	return &handler{
-		c: c,
+	return &Handler{
+		Client: c,
 
 		Handler: h,
-		block:   block,
+		Blocked: errorHandler(code),
 
-		whitelist: true,
+		Whitelist: true,
 	}
 }
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	has, err := h.c.Contains(net.ParseIP(stripPort(r.RemoteAddr)))
+// ServeHTTP implements http.Handler.
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	has, err := h.Client.Contains(net.ParseIP(stripPort(r.RemoteAddr)))
 	if err != nil {
 		server := r.Context().Value(http.ServerContextKey).(*http.Server)
 		if server.ErrorLog != nil {
@@ -87,10 +82,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	} else if has == h.whitelist {
+	} else if has == h.Whitelist {
 		h.Handler.ServeHTTP(w, r)
 	} else {
-		h.block.ServeHTTP(w, r)
+		h.Blocked.ServeHTTP(w, r)
 	}
 }
 
