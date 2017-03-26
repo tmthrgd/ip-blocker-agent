@@ -10,6 +10,7 @@ package httpblocker
 import (
 	"net"
 	"net/http"
+	"net/url"
 
 	"github.com/tmthrgd/ip-blocker-agent"
 )
@@ -74,7 +75,8 @@ func WhitelistWithCode(c *blocker.Client, h http.Handler, code int) http.Handler
 
 // ServeHTTP implements http.Handler.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	has, err := h.Client.Contains(net.ParseIP(stripPort(r.RemoteAddr)))
+	addr := (&url.URL{Host: r.RemoteAddr}).Hostname()
+	has, err := h.Client.Contains(net.ParseIP(addr))
 	if err != nil {
 		server := r.Context().Value(http.ServerContextKey).(*http.Server)
 		if server.ErrorLog != nil {
