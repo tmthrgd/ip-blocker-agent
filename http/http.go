@@ -20,11 +20,14 @@ import (
 // with IP addresses that are/are-not in the block
 // list.
 type Handler struct {
+	// The ip-blocker-agent client to check
+	// IP addresses against.
 	Client *blocker.Client
 
 	// The http.Handler to invoke when the
 	// client is not blocked.
 	Handler http.Handler
+
 	// The http.Handler to invoke when the
 	// client is blocked.
 	Blocked http.Handler
