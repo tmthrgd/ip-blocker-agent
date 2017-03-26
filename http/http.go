@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/tmthrgd/httphandlers"
 	"github.com/tmthrgd/ip-blocker-agent"
 )
 
@@ -48,7 +49,7 @@ func BlockWithCode(c *blocker.Client, h http.Handler, code int) http.Handler {
 		Client: c,
 
 		Handler: h,
-		Blocked: errorHandler(code),
+		Blocked: handlers.ErrorCode(code),
 	}
 }
 
@@ -67,7 +68,7 @@ func WhitelistWithCode(c *blocker.Client, h http.Handler, code int) http.Handler
 		Client: c,
 
 		Handler: h,
-		Blocked: errorHandler(code),
+		Blocked: handlers.ErrorCode(code),
 
 		Whitelist: true,
 	}
@@ -89,10 +90,4 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.Blocked.ServeHTTP(w, r)
 	}
-}
-
-type errorHandler int
-
-func (code errorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, http.StatusText(int(code)), int(code))
 }
