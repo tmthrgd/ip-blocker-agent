@@ -19,7 +19,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 var nameRand *rand.Rand
@@ -756,27 +755,6 @@ func TestClientCount(t *testing.T) {
 	}
 }
 
-func TestClientCorrupted(t *testing.T) {
-	server, client, err := setup(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	server.Close()
-	server.Unlink()
-	defer client.Close()
-
-	client.data = client.data[:headerSize-1]
-
-	if _, err = client.Contains(net.IPv4zero); err != ErrInvalidSharedMemory {
-		t.Error(err)
-	}
-
-	if _, _, _, err = client.Count(); err != ErrInvalidSharedMemory {
-		t.Error(err)
-	}
-}
-
 func TestInsertRangeWithLastAlready(t *testing.T) {
 	server, _, err := setup(false)
 	if err != nil {
@@ -940,59 +918,11 @@ func testPanic(fn func()) (didPanic bool) {
 	return
 }
 
-func TestClosedPanics(t *testing.T) {
-	server, client, err := setup(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client.Close()
-	server.Close()
-	server.Unlink()
-
-	if !testPanic(func() {
-		client.remap(true)
-	}) {
-		t.Error("(*Client).remap did not panic on closed")
-	}
-
-	if !testPanic(func() {
-		client.checkSharedMemory()
-	}) {
-		t.Error("(*Client).checkSharedMemory did not panic on closed")
-	}
-}
-
 func TestClosedErrors(t *testing.T) {
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	client.mu.RLock()
-	done := make(chan struct{}, 1)
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				t.Errorf("(*Client).remap panicked on closed with mutex lock, got %v", err)
-			}
-
-			done <- struct{}{}
-		}()
-
-		client.mu.RLock()
-		if err := client.remap(false); err != ErrClosed {
-			t.Errorf("(*Client).remap did not return ErrClosed on closed with mutex lock, got %v", err)
-		} else {
-			client.mu.RUnlock()
-		}
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-	client.closed = true
-	client.mu.RUnlock()
-	<-done
-	client.closed = false
 
 	client.Close()
 	server.Close()
@@ -1166,17 +1096,10 @@ func TestInvalidVersion(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
-	header := castToHeader(&server.data[0])
+	header := castToHeader(server.hdrData)
 
-	vx := version
-	if version&0x80000000 == 0 {
-		vx |= 0x80000000
-	} else {
-		vx &^= 0x80000000
-	}
-
-	for _, v := range [...]uint32{0xa5a5a5a5, 0, vx} {
-		atomic.StoreUint32((*uint32)(&header.Version), v)
+	for _, v := range [...]uint32{0xa5a5a5a5, 0, version ^ 0x80000000} {
+		atomic.StoreUint32((*uint32)(&header.version), v)
 
 		client, err := Open(server.Name())
 		if err != ErrInvalidSharedMemory {
@@ -1198,7 +1121,7 @@ func TestMemoryTooShort(t *testing.T) {
 	defer server.Unlink()
 	defer server.Close()
 
-	if err = server.file.Truncate(headerSize - 1); err != nil {
+	if err = server.file.Truncate(int64(headerSize - 1)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1212,7 +1135,7 @@ func TestMemoryTooShort(t *testing.T) {
 	}
 }
 
-func TestInvalidHeader(t *testing.T) {
+/*func TestInvalidHeader(t *testing.T) {
 	server, _, err := setup(false)
 	if err != nil {
 		t.Fatal(err)
@@ -1276,70 +1199,9 @@ func TestInvalidHeader(t *testing.T) {
 		*header = orig
 		header.Lock = lock
 	}
-}
+}*/
 
-func testChangeBeforeLock(t *testing.T, corrupter func(*shmHeader)) {
-	server, _, err := setup(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-
-	header := castToHeader(&server.data[0])
-	lock := (*rwLock)(&header.Lock)
-	lock.Lock()
-
-	done := make(chan struct{}, 1)
-	go func() {
-		defer func() {
-			done <- struct{}{}
-		}()
-
-		client, err := Open(server.Name())
-		if corrupter != nil {
-			if err != ErrInvalidSharedMemory {
-				if err == nil {
-					client.Close()
-				}
-
-				t.Error("Open did not return ErrInvalidSharedMemory for invalid header")
-			}
-		} else {
-			if err != nil {
-				t.Error(err)
-			} else {
-				client.Close()
-			}
-		}
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-
-	if err = server.file.Truncate(int64(len(server.data)) + 1); err != nil {
-		t.Fatal(err)
-	}
-
-	if corrupter != nil {
-		corrupter(header)
-	}
-
-	lock.Unlock()
-	<-done
-}
-
-func TestChangeBeforeLock(t *testing.T) {
-	testChangeBeforeLock(t, nil)
-}
-
-func TestCorruptChangeBeforeLock(t *testing.T) {
-	testChangeBeforeLock(t, func(h *shmHeader) {
-		h.IP4.Base, h.IP4.Len = 0, 32
-	})
-}
-
-func TestCorruptContains(t *testing.T) {
+/*func TestCorruptContains(t *testing.T) {
 	server, client, err := setup(true)
 	if err != nil {
 		t.Fatal(err)
@@ -1349,67 +1211,13 @@ func TestCorruptContains(t *testing.T) {
 	defer server.Close()
 	defer client.Close()
 
-	header := castToHeader(&server.data[0])
-
-	lock := (*rwLock)(&header.Lock)
-	lock.Lock()
-
-	header.IP6.Base, header.IP6.Len = 0, 32
-	header.Revision++
-
-	lock.Unlock()
+	header := castToHeader(server.hdrData)
+	header.ip4.base = ^uint64(0)
 
 	if _, err := client.Contains(net.IPv4zero); err != ErrInvalidSharedMemory {
 		t.Error("Contains did not return ErrInvalidSharedMemory for corrupt header")
 	}
-}
-
-func TestClientRemapAlreadyDone(t *testing.T) {
-	server, client, err := setup(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-	defer client.Close()
-
-	client.mu.RLock()
-	client.mu.RLock()
-
-	go func() {
-		defer client.mu.RUnlock()
-
-		if err := client.remap(true); err != nil {
-			t.Error(err)
-		}
-	}()
-
-	defer client.mu.RUnlock()
-
-	if err := client.remap(false); err != nil {
-		t.Error(err)
-	}
-}
-
-func TestClientRemapLockFailure(t *testing.T) {
-	server, client, err := setup(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-	defer client.Close()
-
-	if err = server.file.Truncate(headerSize - 1); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, ok := client.remap(true).(LockReleaseFailedError); !ok {
-		t.Error("remap managed to release invalid lock")
-	}
-}
+}*/
 
 func TestInsertRangeMassive(t *testing.T) {
 	if testing.Short() {
@@ -1867,35 +1675,6 @@ func BenchmarkCommitEmpty(b *testing.B) {
 
 func BenchmarkCommit(b *testing.B) {
 	benchmarkCommit(b, 100000/3)
-}
-
-func BenchmarkClientRemap(b *testing.B) {
-	server, client, err := setup(true)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	defer server.Unlink()
-	defer server.Close()
-	defer client.Close()
-
-	header := castToHeader(&client.data[0])
-	lock := (*rwLock)(&header.Lock)
-	lock.RLock()
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		if err = client.remap(true); err != nil {
-			b.Fatal(err)
-		}
-	}
-
-	b.StopTimer()
-
-	header = castToHeader(&client.data[0])
-	lock = (*rwLock)(&header.Lock)
-	lock.RUnlock()
 }
 
 func benchmarkInsertRemoveRange(b *testing.B, insert bool, iprange string, extra int) {

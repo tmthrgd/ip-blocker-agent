@@ -7,11 +7,14 @@ package blocker
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/tmthrgd/binary-searcher"
 	"github.com/tmthrgd/go-shm"
@@ -28,13 +31,8 @@ func align(d, a int) int {
 	return (d + (a - 1)) &^ (a - 1)
 }
 
-func calculateOffsets(base, ip4Len, ip6Len, ip6rLen int) (ip4BasePos, ip6BasePos, ip6rBasePos, end, size int) {
-	ip4BasePos = align(base, cachelineSize)
-	ip6BasePos = align(ip4BasePos+ip4Len, cachelineSize)
-	ip6rBasePos = align(ip6BasePos+ip6Len, cachelineSize)
-	end = align(ip6rBasePos+ip6rLen, cachelineSize)
-	size = align(end, pageSize)
-	return
+func alignPS(d int) int {
+	return align(d, pageSize)
 }
 
 // Unlink removes the previously created blocker.
@@ -58,8 +56,7 @@ type Server struct {
 	ip6s  searcher.BinarySearcher
 	ip6rs searcher.BinarySearcher
 
-	data []byte
-	end  int
+	hdrData []byte
 
 	mu sync.Mutex
 
@@ -78,27 +75,18 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		return nil, err
 	}
 
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(int(headerSize), 0, 0, 0)
-
-	if err = file.Truncate(int64(size)); err != nil {
+	if err = file.Truncate(int64(headerSize)); err != nil {
 		return nil, err
 	}
 
-	data, err := unix.Mmap(int(file.Fd()), 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := unix.Mmap(int(file.Fd()), 0, int(headerSize), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		return nil, err
 	}
 
-	header := castToHeader(&data[0])
+	header := castToHeader(data)
 
-	lock := (*rwLock)(&header.Lock)
-	lock.Create()
-
-	header.setBlocks(ip4BasePos, 0, ip6BasePos, 0, ip6rBasePos, 0)
-
-	header.Revision = 1
-
-	atomic.StoreUint32((*uint32)(&header.Version), version)
+	atomic.StoreUint32((*uint32)(&header.version), version)
 
 	return &Server{
 		file: file,
@@ -107,80 +95,104 @@ func New(name string, perm os.FileMode) (*Server, error) {
 		ip6s:  searcher.BinarySearcher{Size: net.IPv6len, IncrementBytes: incr.IncrementBytes},
 		ip6rs: searcher.BinarySearcher{Size: net.IPv6len / 2, IncrementBytes: incr.IncrementBytes},
 
-		data: data,
-		end:  end,
+		hdrData: data,
 	}, nil
+}
+
+func (s *Server) increaseSize(n int64) (int64, error) {
+	fi, err := s.file.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	size := fi.Size()
+	size = int64(alignPS(int(size)))
+	if size+n < n {
+		return 0, errors.New("size overflows")
+	}
+
+	if err := s.file.Truncate(size + n); err != nil {
+		return 0, err
+	}
+
+	return size, nil
+}
+
+func doMmap(f *os.File, offset int64, len int, rw bool, fn func([]byte) error) error {
+	prot := unix.PROT_READ
+	if rw {
+		prot |= unix.PROT_WRITE
+	}
+
+	data, err := unix.Mmap(int(f.Fd()), offset, len, prot, unix.MAP_SHARED)
+	runtime.KeepAlive(f)
+	if err != nil {
+		return err
+	}
+	defer unix.Munmap(data)
+
+	return fn(data)
+}
+
+func (s *Server) commitBlock(block, old *ipBlock, bs *searcher.BinarySearcher) error {
+	if len(bs.Data) == 0 {
+		atomic.StoreUint64(&block.base, 0)
+		goto punch
+	}
+
+	{
+		offset, err := s.increaseSize(int64(blockHeaderSize) + int64(len(bs.Data)))
+		if err != nil {
+			return err
+		}
+
+		if err := doMmap(s.file, offset, int(blockHeaderSize)+len(bs.Data), true, func(data []byte) error {
+			caseToBlockHeader(data).len = uint64(len(bs.Data))
+			copy(data[int(blockHeaderSize):], bs.Data)
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		atomic.StoreUint64(&block.base, uint64(offset))
+	}
+
+punch:
+	if old.base == 0 {
+		return nil
+	}
+
+	if err := doMmap(s.file, int64(old.base), int(blockHeaderSize), true, func(data []byte) error {
+		bh := caseToBlockHeader(data)
+
+		for atomic.CompareAndSwapUint64(&bh.locks, 0, ^uint64(0)) {
+			time.Sleep(50 * time.Microsecond)
+		}
+
+		return unix.Fallocate(int(s.file.Fd()), unix.FALLOC_FL_PUNCH_HOLE|unix.FALLOC_FL_KEEP_SIZE, int64(old.base), int64(bh.len))
+	}); err != nil {
+		return err
+	}
+
+	runtime.KeepAlive(s.file)
+	return nil
 }
 
 func (s *Server) commit() error {
 	s.batching = false
 
-	if err := unix.Munmap(s.data); err != nil {
+	h := castToHeader(s.hdrData)
+	old := *h
+
+	if err := s.commitBlock(&h.ip4, &old.ip4, &s.ip4s); err != nil {
 		return err
 	}
 
-	ip4BasePos2, ip6BasePos2, ip6rBasePos2, end2, size2 := calculateOffsets(int(headerSize), len(s.ip4s.Data), len(s.ip6s.Data), len(s.ip6rs.Data))
-
-	end := s.end
-	if end2 > end {
-		end = end2
-	}
-
-	ip4BasePos, ip6BasePos, ip6rBasePos, end, size := calculateOffsets(end, len(s.ip4s.Data), len(s.ip6s.Data), len(s.ip6rs.Data))
-
-	if err := s.file.Truncate(int64(size)); err != nil {
+	if err := s.commitBlock(&h.ip6, &old.ip6, &s.ip6s); err != nil {
 		return err
 	}
 
-	data, err := unix.Mmap(int(s.file.Fd()), 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
-	if err != nil {
-		return err
-	}
-
-	header := castToHeader(&data[0])
-	lock := (*rwLock)(&header.Lock)
-
-	copy(data[ip4BasePos:ip4BasePos+len(s.ip4s.Data):ip6BasePos], s.ip4s.Data)
-	copy(data[ip6BasePos:ip6BasePos+len(s.ip6s.Data):ip6rBasePos], s.ip6s.Data)
-	copy(data[ip6rBasePos:ip6rBasePos+len(s.ip6rs.Data):size], s.ip6rs.Data)
-
-	lock.Lock()
-
-	header.setBlocks(ip4BasePos, len(s.ip4s.Data), ip6BasePos, len(s.ip6s.Data), ip6rBasePos, len(s.ip6rs.Data))
-
-	header.Revision++
-
-	lock.Unlock()
-
-	copy(data[ip4BasePos2:ip4BasePos2+len(s.ip4s.Data):ip6BasePos2], s.ip4s.Data)
-	copy(data[ip6BasePos2:ip6BasePos2+len(s.ip6s.Data):ip6rBasePos2], s.ip6s.Data)
-	copy(data[ip6rBasePos2:ip6rBasePos2+len(s.ip6rs.Data):size2], s.ip6rs.Data)
-
-	lock.Lock()
-
-	header.setBlocks(ip4BasePos2, len(s.ip4s.Data), ip6BasePos2, len(s.ip6s.Data), ip6rBasePos2, len(s.ip6rs.Data))
-
-	header.Revision++
-
-	if err = s.file.Truncate(int64(size2)); err != nil {
-		lock.Unlock()
-		return err
-	}
-
-	lock.Unlock()
-
-	if err := unix.Munmap(data); err != nil {
-		return err
-	}
-
-	data, err = unix.Mmap(int(s.file.Fd()), 0, size2, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
-	if err != nil {
-		return err
-	}
-
-	s.data = data
-	s.end = end2
-	return nil
+	return s.commitBlock(&h.ip6Route, &old.ip6Route, &s.ip6rs)
 }
 
 // Commit ends a batching operation and commits all
@@ -512,7 +524,7 @@ func (s *Server) close() error {
 	s.ip6s.Clear()
 	s.ip6rs.Clear()
 
-	if err := unix.Munmap(s.data); err != nil {
+	if err := unix.Munmap(s.hdrData); err != nil {
 		return err
 	}
 
@@ -590,10 +602,34 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 		return
 	}
 
-	header := castToHeader(&s.data[0])
+	h := castToHeader(s.hdrData)
 
-	ip4 = int(header.IP4.Len / net.IPv4len)
-	ip6 = int(header.IP6.Len / net.IPv6len)
-	ip6routes = int(header.IP6Route.Len / (net.IPv6len / 2))
+	if h.ip4.base != 0 {
+		if err := doMmap(s.file, int64(h.ip4.base), int(blockHeaderSize), false, func(data []byte) error {
+			ip4 = int(caseToBlockHeader(data).len / net.IPv4len)
+			return nil
+		}); err != nil {
+			return 0, 0, 0, err
+		}
+	}
+
+	if h.ip6.base != 0 {
+		if err := doMmap(s.file, int64(h.ip6.base), int(blockHeaderSize), false, func(data []byte) error {
+			ip6 = int(caseToBlockHeader(data).len / net.IPv6len)
+			return nil
+		}); err != nil {
+			return 0, 0, 0, err
+		}
+	}
+
+	if h.ip6Route.base != 0 {
+		if err := doMmap(s.file, int64(h.ip6Route.base), int(blockHeaderSize), false, func(data []byte) error {
+			ip6routes = int(caseToBlockHeader(data).len / (net.IPv6len / 2))
+			return nil
+		}); err != nil {
+			return 0, 0, 0, err
+		}
+	}
+
 	return
 }
