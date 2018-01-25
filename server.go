@@ -147,7 +147,7 @@ func (s *Server) commitBlock(block, old *ipBlock, bs *searcher.BinarySearcher) e
 		}
 
 		if err := doMmap(s.file, offset, int(blockHeaderSize)+len(bs.Data), true, func(data []byte) error {
-			bh := caseToBlockHeader(data)
+			bh := castToBlockHeader(data)
 			bh.len = uint64(len(bs.Data))
 			bh.locks = 1
 			copy(data[int(blockHeaderSize):], bs.Data)
@@ -165,7 +165,7 @@ punch:
 	}
 
 	if err := doMmap(s.file, int64(old.base), int(blockHeaderSize), true, func(data []byte) error {
-		bh := caseToBlockHeader(data)
+		bh := castToBlockHeader(data)
 
 		for atomic.CompareAndSwapUint64(&bh.locks, 1, 0) {
 			time.Sleep(50 * time.Microsecond)
@@ -608,7 +608,7 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 
 	if h.ip4.base != 0 {
 		if err := doMmap(s.file, int64(h.ip4.base), int(blockHeaderSize), false, func(data []byte) error {
-			ip4 = int(caseToBlockHeader(data).len / net.IPv4len)
+			ip4 = int(castToBlockHeader(data).len / net.IPv4len)
 			return nil
 		}); err != nil {
 			return 0, 0, 0, err
@@ -617,7 +617,7 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 
 	if h.ip6.base != 0 {
 		if err := doMmap(s.file, int64(h.ip6.base), int(blockHeaderSize), false, func(data []byte) error {
-			ip6 = int(caseToBlockHeader(data).len / net.IPv6len)
+			ip6 = int(castToBlockHeader(data).len / net.IPv6len)
 			return nil
 		}); err != nil {
 			return 0, 0, 0, err
@@ -626,7 +626,7 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 
 	if h.ip6Route.base != 0 {
 		if err := doMmap(s.file, int64(h.ip6Route.base), int(blockHeaderSize), false, func(data []byte) error {
-			ip6routes = int(caseToBlockHeader(data).len / (net.IPv6len / 2))
+			ip6routes = int(castToBlockHeader(data).len / (net.IPv6len / 2))
 			return nil
 		}); err != nil {
 			return 0, 0, 0, err

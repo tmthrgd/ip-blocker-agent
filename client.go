@@ -96,7 +96,7 @@ redo:
 	}
 
 	if err := doMmap(c.file, offset, int(blockHeaderSize), true, func(data []byte) error {
-		bh := caseToBlockHeader(data)
+		bh := castToBlockHeader(data)
 		if !takeLock(&bh.locks) {
 			return errLockFailure
 		}

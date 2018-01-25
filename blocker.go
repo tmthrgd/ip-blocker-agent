@@ -26,7 +26,7 @@ func castToHeader(data []byte) *shmHeader {
 	return (*shmHeader)(unsafe.Pointer(&data[0]))
 }
 
-func caseToBlockHeader(data []byte) *blockHeader {
+func castToBlockHeader(data []byte) *blockHeader {
 	return (*blockHeader)(unsafe.Pointer(&data[0]))
 }
 
