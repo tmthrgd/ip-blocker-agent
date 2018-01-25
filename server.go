@@ -134,67 +134,81 @@ func doMmap(f *os.File, offset int64, len int, rw bool, fn func([]byte) error) e
 	return fn(data)
 }
 
-func (s *Server) commitBlock(block, old *ipBlock, bs *searcher.BinarySearcher) error {
-	if len(bs.Data) == 0 {
-		atomic.StoreUint64(&block.base, 0)
-		goto punch
+func (s *Server) commitBlock(blockIdx *uint32, bs *searcher.BinarySearcher) error {
+	h := castToHeader(s.hdrData)
+
+	newIdx := ^uint32(0)
+	for i := range h.blocks {
+		if i := uint32(i); h.ip4 != i && h.ip6 != i && h.ip6Route != i {
+			newIdx = i
+			break
+		}
 	}
 
-	{
-		offset, err := s.increaseSize(int64(blockHeaderSize) + int64(len(bs.Data)))
+	if newIdx >= uint32(len(h.blocks)) {
+		return errors.New("failed to find free block")
+	}
+
+	oldBlock := &h.blocks[*blockIdx]
+	newBlock := &h.blocks[newIdx]
+
+	if lock := atomic.LoadUint64(&newBlock.locks); lock != 0 && lock != ^uint64(0) {
+		panic("block still in use")
+	}
+
+	if len(bs.Data) != 0 {
+		offset, err := s.increaseSize(int64(len(bs.Data)))
 		if err != nil {
 			return err
 		}
 
-		if err := doMmap(s.file, offset, int(blockHeaderSize)+len(bs.Data), true, func(data []byte) error {
-			bh := castToBlockHeader(data)
-			bh.len = uint64(len(bs.Data))
-			bh.locks = 1
-			copy(data[int(blockHeaderSize):], bs.Data)
+		if err := doMmap(s.file, offset, len(bs.Data), true, func(data []byte) error {
+			copy(data, bs.Data)
 			return nil
 		}); err != nil {
 			return err
 		}
 
-		atomic.StoreUint64(&block.base, uint64(offset))
+		*newBlock = ipBlock{
+			base: uint64(offset),
+			len:  uint64(len(bs.Data)),
+		}
+	} else {
+		*newBlock = ipBlock{}
 	}
 
-punch:
-	if old.base == 0 {
+	atomic.StoreUint32(blockIdx, newIdx)
+
+	for atomic.CompareAndSwapUint64(&oldBlock.locks, 0, ^uint64(0)) {
+		time.Sleep(50 * time.Microsecond)
+	}
+
+	base, len := oldBlock.base, oldBlock.len
+	*oldBlock = ipBlock{}
+
+	if base == 0 {
 		return nil
 	}
 
-	if err := doMmap(s.file, int64(old.base), int(blockHeaderSize), true, func(data []byte) error {
-		bh := castToBlockHeader(data)
-
-		for atomic.CompareAndSwapUint64(&bh.locks, 1, 0) {
-			time.Sleep(50 * time.Microsecond)
-		}
-
-		return unix.Fallocate(int(s.file.Fd()), unix.FALLOC_FL_PUNCH_HOLE|unix.FALLOC_FL_KEEP_SIZE, int64(old.base), int64(bh.len))
-	}); err != nil {
-		return err
-	}
-
+	err := unix.Fallocate(int(s.file.Fd()), unix.FALLOC_FL_PUNCH_HOLE|unix.FALLOC_FL_KEEP_SIZE, int64(base), int64(len))
 	runtime.KeepAlive(s.file)
-	return nil
+	return err
 }
 
 func (s *Server) commit() error {
 	s.batching = false
 
 	h := castToHeader(s.hdrData)
-	old := *h
 
-	if err := s.commitBlock(&h.ip4, &old.ip4, &s.ip4s); err != nil {
+	if err := s.commitBlock(&h.ip4, &s.ip4s); err != nil {
 		return err
 	}
 
-	if err := s.commitBlock(&h.ip6, &old.ip6, &s.ip6s); err != nil {
+	if err := s.commitBlock(&h.ip6, &s.ip6s); err != nil {
 		return err
 	}
 
-	return s.commitBlock(&h.ip6Route, &old.ip6Route, &s.ip6rs)
+	return s.commitBlock(&h.ip6Route, &s.ip6rs)
 }
 
 // Commit ends a batching operation and commits all
@@ -606,32 +620,9 @@ func (s *Server) Count() (ip4, ip6, ip6routes int, err error) {
 
 	h := castToHeader(s.hdrData)
 
-	if h.ip4.base != 0 {
-		if err := doMmap(s.file, int64(h.ip4.base), int(blockHeaderSize), false, func(data []byte) error {
-			ip4 = int(castToBlockHeader(data).len / net.IPv4len)
-			return nil
-		}); err != nil {
-			return 0, 0, 0, err
-		}
-	}
-
-	if h.ip6.base != 0 {
-		if err := doMmap(s.file, int64(h.ip6.base), int(blockHeaderSize), false, func(data []byte) error {
-			ip6 = int(castToBlockHeader(data).len / net.IPv6len)
-			return nil
-		}); err != nil {
-			return 0, 0, 0, err
-		}
-	}
-
-	if h.ip6Route.base != 0 {
-		if err := doMmap(s.file, int64(h.ip6Route.base), int(blockHeaderSize), false, func(data []byte) error {
-			ip6routes = int(castToBlockHeader(data).len / (net.IPv6len / 2))
-			return nil
-		}); err != nil {
-			return 0, 0, 0, err
-		}
-	}
+	ip4 = int(h.blocks[h.ip4].len / net.IPv4len)
+	ip6 = int(h.blocks[h.ip6].len / net.IPv6len)
+	ip6routes = int(h.blocks[h.ip6Route].len / (net.IPv6len / 2))
 
 	return
 }

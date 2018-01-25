@@ -47,7 +47,7 @@ func Open(name string) (*Client, error) {
 		return nil, ErrInvalidSharedMemory
 	}
 
-	data, err := unix.Mmap(int(file.Fd()), 0, int(headerSize), unix.PROT_READ, unix.MAP_SHARED)
+	data, err := unix.Mmap(int(file.Fd()), 0, int(headerSize), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
 	if err != nil {
 		file.Close()
 		return nil, err
@@ -69,7 +69,7 @@ func Open(name string) (*Client, error) {
 }
 
 func takeLock(addr *uint64) bool {
-	for v := atomic.LoadUint64(addr); v != 0 && v != ^uint64(0); {
+	for v := atomic.LoadUint64(addr); v < ^uint64(0)-1; {
 		if atomic.CompareAndSwapUint64(addr, v, v+1) {
 			return true
 		}
@@ -81,43 +81,44 @@ func takeLock(addr *uint64) bool {
 }
 
 func releaseLock(addr *uint64) {
-	if atomic.AddUint64(addr, ^uint64(0)) == 0 {
+	if atomic.AddUint64(addr, ^uint64(0)) == ^uint64(0) {
 		panic("ip-blocker-agent: unlock of unlocked mutex")
 	}
 }
 
-var errLockFailure = errors.New("failed to acquite lock")
+func (c *Client) doBlock(blockIdx *uint32, fn func(block *ipBlock) error) error {
+	h := castToHeader(c.hdrData)
 
-func (c *Client) do(block *ipBlock, fn func([]byte) error) error {
-redo:
-	offset := int64(atomic.LoadUint64(&block.base))
-	if offset == 0 {
-		return nil
-	}
-
-	if err := doMmap(c.file, offset, int(blockHeaderSize), true, func(data []byte) error {
-		bh := castToBlockHeader(data)
-		if !takeLock(&bh.locks) {
-			return errLockFailure
-		}
-		defer releaseLock(&bh.locks)
-
-		return doMmap(c.file, offset, int(blockHeaderSize)+int(bh.len), false, func(data []byte) error {
-			return fn(data[int(blockHeaderSize):])
-		})
-	}); err != nil {
-		if err == errLockFailure {
-			goto redo
+	var block *ipBlock
+	for {
+		idx := atomic.LoadUint32(blockIdx)
+		if idx >= uint32(len(h.blocks)) {
+			return errors.New("invalid block index")
 		}
 
-		return err
-	}
+		block = &h.blocks[idx]
 
-	return nil
+		if takeLock(&block.locks) {
+			break
+		}
+	}
+	defer releaseLock(&block.locks)
+
+	return fn(block)
 }
 
-func (c *Client) contains(ip net.IP, block *ipBlock) (has bool, err error) {
-	return has, c.do(block, func(data []byte) error {
+func (c *Client) do(blockIdx *uint32, fn func([]byte) error) error {
+	return c.doBlock(blockIdx, func(block *ipBlock) error {
+		if block.base == 0 {
+			return nil
+		}
+
+		return doMmap(c.file, int64(block.base), int(block.len), false, fn)
+	})
+}
+
+func (c *Client) contains(ip net.IP, blockIdx *uint32) (has bool, err error) {
+	return has, c.do(blockIdx, func(data []byte) error {
 		has = searcher.New(data, len(ip)).Contains(ip)
 		return nil
 	})
@@ -178,6 +179,13 @@ func (c *Client) Name() string {
 	return c.file.Name()
 }
 
+func (c *Client) count(blockIdx *uint32, len int) (count int, err error) {
+	return count, c.doBlock(blockIdx, func(block *ipBlock) error {
+		count = int(block.len / uint64(len))
+		return nil
+	})
+}
+
 // Count returns the number of IPv4 addresses, IPv6
 // address and IPv6 routes stored in the blocklist.
 //
@@ -193,24 +201,15 @@ func (c *Client) Count() (ip4, ip6, ip6routes int, err error) {
 
 	h := castToHeader(c.hdrData)
 
-	if err := c.do(&h.ip4, func(data []byte) error {
-		ip4 = len(data) / net.IPv4len
-		return nil
-	}); err != nil {
+	if ip4, err = c.count(&h.ip4, net.IPv4len); err != nil {
 		return 0, 0, 0, err
 	}
 
-	if err := c.do(&h.ip6, func(data []byte) error {
-		ip6 = len(data) / net.IPv6len
-		return nil
-	}); err != nil {
+	if ip6, err = c.count(&h.ip6, net.IPv6len); err != nil {
 		return 0, 0, 0, err
 	}
 
-	if err := c.do(&h.ip6Route, func(data []byte) error {
-		ip6routes = len(data) / (net.IPv6len / 2)
-		return nil
-	}); err != nil {
+	if ip6routes, err = c.count(&h.ip6Route, net.IPv6len/2); err != nil {
 		return 0, 0, 0, err
 	}
 

@@ -7,32 +7,26 @@ package blocker
 
 import "unsafe"
 
-type blockHeader struct {
+type ipBlock struct {
+	base  uint64
 	len   uint64
 	locks uint64
-}
-
-type ipBlock struct {
-	base uint64
 }
 
 type shmHeader struct {
 	version uint32
 
-	ip4, ip6, ip6Route ipBlock
+	ip4, ip6, ip6Route uint32 // The smallest atomic is 32-bits.
+
+	blocks [4]ipBlock
 }
 
 func castToHeader(data []byte) *shmHeader {
 	return (*shmHeader)(unsafe.Pointer(&data[0]))
 }
 
-func castToBlockHeader(data []byte) *blockHeader {
-	return (*blockHeader)(unsafe.Pointer(&data[0]))
-}
-
 const (
-	headerSize      = unsafe.Sizeof(shmHeader{})
-	blockHeaderSize = unsafe.Sizeof(blockHeader{})
+	headerSize = unsafe.Sizeof(shmHeader{})
 
-	version = 0x00000002
+	version = 0x00000003
 )
