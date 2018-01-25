@@ -69,7 +69,7 @@ func Open(name string) (*Client, error) {
 }
 
 func takeLock(addr *uint64) bool {
-	for v := atomic.LoadUint64(addr); v < ^uint64(0)-1; {
+	for v := atomic.LoadUint64(addr); v != 0 && v != ^uint64(0); {
 		if atomic.CompareAndSwapUint64(addr, v, v+1) {
 			return true
 		}
@@ -81,7 +81,9 @@ func takeLock(addr *uint64) bool {
 }
 
 func releaseLock(addr *uint64) {
-	atomic.AddUint64(addr, ^uint64(0))
+	if atomic.AddUint64(addr, ^uint64(0)) == 0 {
+		panic("ip-blocker-agent: unlock of unlocked mutex")
+	}
 }
 
 var errLockFailure = errors.New("failed to acquite lock")

@@ -147,7 +147,9 @@ func (s *Server) commitBlock(block, old *ipBlock, bs *searcher.BinarySearcher) e
 		}
 
 		if err := doMmap(s.file, offset, int(blockHeaderSize)+len(bs.Data), true, func(data []byte) error {
-			caseToBlockHeader(data).len = uint64(len(bs.Data))
+			bh := caseToBlockHeader(data)
+			bh.len = uint64(len(bs.Data))
+			bh.locks = 1
 			copy(data[int(blockHeaderSize):], bs.Data)
 			return nil
 		}); err != nil {
@@ -165,7 +167,7 @@ punch:
 	if err := doMmap(s.file, int64(old.base), int(blockHeaderSize), true, func(data []byte) error {
 		bh := caseToBlockHeader(data)
 
-		for atomic.CompareAndSwapUint64(&bh.locks, 0, ^uint64(0)) {
+		for atomic.CompareAndSwapUint64(&bh.locks, 1, 0) {
 			time.Sleep(50 * time.Microsecond)
 		}
 
