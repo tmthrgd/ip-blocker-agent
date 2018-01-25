@@ -23,6 +23,10 @@ type Client struct {
 
 	hdrData []byte
 
+	dmu  sync.RWMutex
+	dwg  sync.WaitGroup
+	data []byte
+
 	mu sync.RWMutex
 
 	closed bool
@@ -86,6 +90,50 @@ func releaseLock(addr *uint64) {
 	}
 }
 
+func (c *Client) mmap(offset, length uint64) ([]byte, *sync.WaitGroup, error) {
+	size := int(offset + length)
+	if size <= 0 || uint64(size) < offset {
+		return nil, nil, errors.New("overflow")
+	}
+
+	c.dmu.RLock()
+	if size < len(c.data) {
+		c.dwg.Add(1)
+		c.dmu.RUnlock()
+		return c.data[offset:size], &c.dwg, nil
+	}
+
+	c.dmu.RUnlock()
+
+	c.dmu.Lock()
+	defer c.dmu.Unlock()
+
+	if size < len(c.data) {
+		c.dwg.Add(1)
+		return c.data[offset:size], &c.dwg, nil
+	}
+
+	c.dwg.Wait()
+
+	if c.data != nil {
+		if err := unix.Munmap(c.data); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	c.data = nil
+
+	data, err := unix.Mmap(int(c.file.Fd()), 0, size, unix.PROT_READ, unix.MAP_SHARED)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	c.data = data
+
+	c.dwg.Add(1)
+	return data[offset:size], &c.dwg, nil
+}
+
 func (c *Client) doBlock(blockIdx *uint32, fn func(block *ipBlock) error) error {
 	h := castToHeader(c.hdrData)
 
@@ -113,7 +161,13 @@ func (c *Client) do(blockIdx *uint32, fn func([]byte) error) error {
 			return nil
 		}
 
-		return doMmap(c.file, int64(block.base), int(block.len), false, fn)
+		data, wg, err := c.mmap(block.base, block.len)
+		if err != nil {
+			return err
+		}
+		defer wg.Done()
+
+		return fn(data)
 	})
 }
 
@@ -169,6 +223,14 @@ func (c *Client) Close() error {
 		}
 
 		c.hdrData = nil
+	}
+
+	if c.data != nil {
+		if err := unix.Munmap(c.data); err != nil {
+			return err
+		}
+
+		c.data = nil
 	}
 
 	return c.file.Close()
