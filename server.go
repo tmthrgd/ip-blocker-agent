@@ -118,22 +118,6 @@ func (s *Server) increaseSize(n int64) (int64, error) {
 	return size, nil
 }
 
-func doMmap(f *os.File, offset int64, len int, rw bool, fn func([]byte) error) error {
-	prot := unix.PROT_READ
-	if rw {
-		prot |= unix.PROT_WRITE
-	}
-
-	data, err := unix.Mmap(int(f.Fd()), offset, len, prot, unix.MAP_SHARED)
-	runtime.KeepAlive(f)
-	if err != nil {
-		return err
-	}
-	defer unix.Munmap(data)
-
-	return fn(data)
-}
-
 func (s *Server) commitBlock(blockIdx *uint32, bs *searcher.BinarySearcher) error {
 	h := castToHeader(s.hdrData)
 
@@ -162,10 +146,7 @@ func (s *Server) commitBlock(blockIdx *uint32, bs *searcher.BinarySearcher) erro
 			return err
 		}
 
-		if err := doMmap(s.file, offset, len(bs.Data), true, func(data []byte) error {
-			copy(data, bs.Data)
-			return nil
-		}); err != nil {
+		if _, err := s.file.WriteAt(bs.Data, offset); err != nil {
 			return err
 		}
 
