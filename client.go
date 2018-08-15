@@ -97,7 +97,7 @@ func (c *Client) mmap(offset, length uint64) ([]byte, *sync.WaitGroup, error) {
 	}
 
 	c.dmu.RLock()
-	if size < len(c.data) {
+	if size <= len(c.data) {
 		c.dwg.Add(1)
 		c.dmu.RUnlock()
 		return c.data[offset:size], &c.dwg, nil
@@ -108,7 +108,7 @@ func (c *Client) mmap(offset, length uint64) ([]byte, *sync.WaitGroup, error) {
 	c.dmu.Lock()
 	defer c.dmu.Unlock()
 
-	if size < len(c.data) {
+	if size <= len(c.data) {
 		c.dwg.Add(1)
 		return c.data[offset:size], &c.dwg, nil
 	}
